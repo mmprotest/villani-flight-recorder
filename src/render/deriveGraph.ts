@@ -127,11 +127,13 @@ export function deriveExecutionGraph(
           ? "none"
           : "unavailable";
   const fileSeverity: Severity =
-    captured.status === "not_applicable"
+    captured.status === "not_applicable" && diffOk
       ? "none"
-      : captured.fileEdits
-        ? "none"
-        : "unavailable";
+      : captured.status === "not_applicable"
+        ? "unavailable"
+        : captured.fileEdits
+          ? "none"
+          : "unavailable";
   const outputSeverity: Severity = ["render_failed", "write_failed"].includes(
     replayStatus.status,
   )
@@ -264,12 +266,12 @@ export function deriveExecutionGraph(
     "discover:parse",
     "parse:normalize",
     "normalize:correlate",
+    "correlate:replay-output",
     "normalize:agent-events",
     "agent-events:commands",
     "commands:file-changes",
     "commands:git-state",
     "git-state:diff-capture",
-    "diff-capture:replay-output",
   ];
   const links = pairs.map((s, i) => {
     const [from, to] = s.split(":");

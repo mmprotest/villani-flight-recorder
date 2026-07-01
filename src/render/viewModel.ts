@@ -25,6 +25,10 @@ export type Severity =
 export interface DetailViewModel {
   title: string;
   summary?: string;
+  sourceLabel?: string;
+  impactLabel?: string;
+  replayImpactLabel?: string;
+  capturedImpactLabel?: string;
   meta?: Record<string, string>;
   raw?: unknown;
 }
