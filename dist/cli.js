@@ -41,6 +41,8 @@ program
     .option("--open")
     .option("--provider <provider>")
     .option("--session <path>")
+    .option("--root <path>")
+    .option("--out <path>")
     .option("--no-redact")
     .option("--redact")
     .action(async (o) => {
@@ -50,14 +52,18 @@ program
     if (o.session)
         session = await parse((o.provider ?? "unknown"), o.session);
     else {
-        const picked = chooseLatest(await findSessions({ provider: o.provider }));
+        const roots = o.root ? [o.root] : undefined;
+        const picked = chooseLatest(await findSessions({ provider: o.provider, roots }));
         if (!picked.candidate)
-            throw new Error("No supported sessions found.");
+            throw new Error(`No supported sessions found under ${o.root ?? "default session roots"}.`);
         if (picked.uncertain)
             console.warn("Warning: repo matching was uncertain; selected most recently modified session.");
         session = await parse(picked.candidate.provider, picked.candidate.path);
     }
-    const file = await renderReplay(session, { redact: o.redact !== false });
+    const file = await renderReplay(session, {
+        redact: o.redact !== false,
+        out: o.out,
+    });
     console.log(file);
     if (o.open)
         openBrowser(file);
@@ -67,10 +73,12 @@ program
     .requiredOption("--from <ref>")
     .requiredOption("--to <ref>")
     .option("--open")
+    .option("--out <path>")
     .option("--no-redact")
     .action(async (o) => {
     const file = await renderReplay(await buildGitReplay(o.from, o.to), {
         redact: o.redact !== false,
+        out: o.out,
     });
     console.log(file);
     if (o.open)

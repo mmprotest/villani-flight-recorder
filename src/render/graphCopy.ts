@@ -41,7 +41,7 @@ export function graphNodeSubtitle(
   const { captured, replayStatus } = context;
   switch (nodeId) {
     case "discover":
-      return context.hasSource ? "Source found" : "No source";
+      return context.hasSource ? "Source found" : "No source found";
     case "parse":
       if (!context.eventCount) return "No events";
       if (context.warningCount) return "Partial parse";
@@ -58,12 +58,12 @@ export function graphNodeSubtitle(
         return "With warnings";
       return "HTML written";
     case "agent-events":
-      if (captured.status === "not_applicable") return "N/A";
+      if (captured.status === "not_applicable") return "Not an agent run";
       if (!context.eventCount) return "Unknown";
       if (context.unknownCount) return `${context.unknownCount} partial`;
       return context.eventCount ? `${context.eventCount} events` : "Captured";
     case "commands":
-      if (captured.status === "not_applicable") return "N/A";
+      if (captured.status === "not_applicable") return "No command evidence";
       if (captured.failedTests)
         return `${captured.failedTests} failed ${captured.failedTests === 1 ? "test" : "tests"}`;
       if (captured.failedCommands)
@@ -73,16 +73,16 @@ export function graphNodeSubtitle(
       return "No commands";
     case "file-changes":
       if (captured.status === "not_applicable")
-        return context.diffOk ? "From commits" : "N/A";
+        return context.diffOk ? "From commits" : "No file evidence";
       if (captured.fileEdits)
         return `${captured.fileEdits} ${captured.fileEdits === 1 ? "edit" : "edits"}`;
       return "No edits";
     case "correlate":
       if (captured.status === "not_applicable" && context.hasGit)
         return "Git skipped";
-      return context.hasGit ? "Repo linked" : "No repo";
+      return context.hasGit ? "Repo linked" : "No repo detected";
     case "git-state":
-      if (!context.hasGit) return "Not a repo";
+      if (!context.hasGit) return "No repo detected";
       if (!context.gitStatus) return "Captured";
       return context.gitStatus.toLowerCase().includes("clean")
         ? "Clean"
@@ -92,7 +92,7 @@ export function graphNodeSubtitle(
         return captured.status === "not_applicable"
           ? "From commits"
           : "Captured";
-      return context.hasGit ? "No diff" : "Unavailable";
+      return context.hasGit ? "No diff captured" : "No repo detected";
     default:
       return "Captured";
   }
@@ -103,17 +103,17 @@ export function graphNodeBadge(
   context: GraphCopyContext,
 ): string | undefined {
   if (nodeId === "commands") {
-    if (context.captured.status === "not_applicable") return "N/A";
+    if (context.captured.status === "not_applicable") return "Skipped";
     if (context.captured.failedCommands || context.captured.failedTests)
       return "FAILED";
   }
   if (nodeId === "agent-events" && context.captured.status === "not_applicable")
-    return "N/A";
+    return "Skipped";
   if (
     ["correlate", "git-state", "diff-capture"].includes(nodeId) &&
     !context.hasGit
   )
-    return "N/A";
+    return "Skipped";
   if (nodeId === "replay-output") {
     return ["render_failed", "write_failed"].includes(
       context.replayStatus.status,

@@ -6,11 +6,18 @@ import { replayRoot, safeSegment } from "../utils/paths.js";
 import { redactDeep } from "../redaction/redact.js";
 export async function renderReplay(session, opts = {}) {
     const cwd = opts.cwd ?? process.cwd();
-    const out = path.join(replayRoot(cwd), `${new Date().toISOString().replace(/[:.]/g, "-")}-${safeSegment(session.provider)}`);
+    const defaultName = `${new Date().toISOString().replace(/[:.]/g, "-")}-${safeSegment(session.provider)}`;
+    const requestedOut = opts.out ? path.resolve(cwd, opts.out) : undefined;
+    const htmlOut = requestedOut?.toLowerCase().endsWith(".html");
+    const out = requestedOut
+        ? htmlOut
+            ? path.dirname(requestedOut)
+            : requestedOut
+        : path.join(replayRoot(cwd), defaultName);
     await fs.mkdir(out, { recursive: true });
     const s = opts.redact === false ? session : redactDeep(session);
     const git = await getGitInfo(cwd);
-    const file = path.join(out, "index.html");
+    const file = requestedOut && htmlOut ? requestedOut : path.join(out, "index.html");
     await fs.writeFile(file, renderDashboard(s, opts.redact === false ? git : redactDeep(git)), "utf8");
     return file;
 }
