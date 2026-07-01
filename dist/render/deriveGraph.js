@@ -1,7 +1,7 @@
 import { GRAPH_COORDS } from "./graphGeometry.js";
 import { deriveCapturedRunStatus } from "./deriveCapturedRunStatus.js";
 import { deriveReplayStatus } from "./deriveReplayStatus.js";
-import { pluralize } from "./format.js";
+import { graphNodeBadge, graphNodeSubtitle, graphNodeTitle, } from "./graphCopy.js";
 export const GRAPH_LINKS = [
     {
         id: "discover-parse",
@@ -183,51 +183,50 @@ export function deriveExecutionGraph(input) {
             replayStatus.status === "partial"
             ? "minor-warning"
             : "none";
+    const isGitReplay = captured.status === "not_applicable";
+    const repositoryLaneTone = !hasGit
+        ? "dimmed"
+        : isGitReplay
+            ? "emphasis"
+            : "normal";
+    const capturedLaneTone = isGitReplay
+        ? "dimmed"
+        : "normal";
+    const copyContext = {
+        eventCount: events.length,
+        unknownCount: unknown,
+        warningCount: warnings.length,
+        hasSource: Boolean(session.path || session.sessionPath || session.provider),
+        hasGit,
+        diffOk,
+        gitStatus: git?.status,
+        captured,
+        replayStatus,
+    };
+    const makeNode = (id, severity, icon, laneTone) => node(id, graphNodeTitle(id), severity, graphNodeSubtitle(id, copyContext), icon, graphNodeBadge(id, copyContext), laneTone);
     const nodes = [
-        node("discover", "Discover", session.path || session.sessionPath || session.provider
+        makeNode("discover", session.path || session.sessionPath || session.provider
             ? "none"
-            : "failed", session.sessionPath ? "session found" : "source context", "discover"),
-        node("parse", "Parse", parseSeverity, warnings.length
-            ? `Parsed with ${pluralize(warnings.length, "warning")}`
-            : pluralize(events.length, "event"), "parse", parseSeverity === "minor-warning" ? "partial" : undefined),
-        node("normalize", "Normalize", events.length ? "none" : "failed", events.length ? "normalized events" : "empty timeline", "normalize"),
-        node("agent-events", "Agent Events", agentSeverity, captured.status === "not_applicable"
-            ? "Git-only replay"
-            : unknown
-                ? `${events.length} events, ${unknown} unknown`
-                : `${events.length} events captured`, "terminal", captured.status === "not_applicable"
-            ? "N/A"
-            : agentSeverity === "minor-warning"
-                ? "partial"
-                : undefined, captured.status === "not_applicable" ? "dimmed" : undefined),
-        node("commands", "Commands", commandSeverity, captured.status === "not_applicable"
-            ? "Tools and tests"
-            : "Tools and tests", "terminal", captured.status === "not_applicable"
-            ? "N/A"
-            : commandSeverity === "failed"
-                ? "FAILED"
-                : commandSeverity === "unavailable"
-                    ? "N/A"
-                    : undefined, captured.status === "not_applicable" ? "dimmed" : undefined),
-        node("file-changes", "File Changes", fileSeverity, captured.status === "not_applicable"
-            ? "From commits"
-            : captured.fileEdits
-                ? `${captured.fileEdits} edits captured`
-                : "none captured", "edit", fileSeverity === "unavailable" ? "N/A" : undefined),
-        node("correlate", "Correlate", hasGit ? "none" : "unavailable", hasGit ? "repo metadata" : "not a git repo", "correlate", hasGit ? undefined : "not captured", captured.status === "not_applicable" && hasGit ? "emphasis" : undefined),
-        node("git-state", "Git State", hasGit ? "none" : "unavailable", git?.head ? git.head.slice(0, 12) : "not a git repo", "branch", hasGit ? undefined : "not captured", captured.status === "not_applicable" && hasGit ? "emphasis" : undefined),
-        node("diff-capture", "Diff Capture", diffOk ? "none" : hasGit ? "minor-warning" : "unavailable", diffOk ? "diff available" : "no git diff captured", "edit", diffOk ? undefined : "not captured", captured.status === "not_applicable" && hasGit ? "emphasis" : undefined),
-        node("replay-output", "Replay Output", outputSeverity, replayStatus.status === "generated"
-            ? "HTML written"
-            : replayStatus.reason, "flag", outputSeverity === "failed"
-            ? "FAILED"
-            : outputSeverity === "minor-warning"
-                ? "WARNING"
-                : "COMPLETE"),
+            : "failed", "discover"),
+        makeNode("parse", parseSeverity, "parse"),
+        makeNode("normalize", events.length ? "none" : "failed", "normalize"),
+        makeNode("agent-events", agentSeverity, "terminal", capturedLaneTone),
+        makeNode("commands", commandSeverity, "terminal", capturedLaneTone),
+        makeNode("file-changes", fileSeverity, "edit", isGitReplay && diffOk ? "emphasis" : capturedLaneTone),
+        makeNode("correlate", hasGit ? "none" : "unavailable", "correlate", repositoryLaneTone),
+        makeNode("git-state", hasGit ? "none" : "unavailable", "branch", repositoryLaneTone),
+        makeNode("diff-capture", diffOk ? "none" : hasGit ? "minor-warning" : "unavailable", "edit", repositoryLaneTone),
+        makeNode("replay-output", outputSeverity, "flag"),
     ];
     const nodesById = new Map(nodes.map((n) => [n.id, n]));
     const links = GRAPH_LINKS.map((link) => ({
         ...link,
+        laneTone: link.kind === "repo_correlation" || link.kind === "repo_artifact"
+            ? repositoryLaneTone
+            : link.kind === "captured_execution" ||
+                link.kind === "captured_artifact"
+                ? capturedLaneTone
+                : undefined,
         status: deriveGraphLinkStatus({
             link,
             nodesById,

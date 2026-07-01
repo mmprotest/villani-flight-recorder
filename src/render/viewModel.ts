@@ -40,6 +40,7 @@ export interface MetricCardViewModel {
   icon: IconName;
   tone?: "default" | "success" | "warning" | "error" | "info";
   telemetryAvailable?: boolean;
+  empty?: boolean;
 }
 export interface TimelineEventViewModel {
   id: string;
@@ -77,6 +78,7 @@ export interface GraphLinkViewModel {
   from: string;
   to: string;
   kind?: string;
+  laneTone?: "normal" | "dimmed" | "emphasis";
   status: Exclude<Status, "skipped">;
 }
 export interface ExecutionGraphViewModel {

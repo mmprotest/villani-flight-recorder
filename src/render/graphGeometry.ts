@@ -1,10 +1,10 @@
 import { GraphNodeViewModel } from "./viewModel.js";
 
-export const GRAPH_WIDTH = 1040;
+export const GRAPH_WIDTH = 980;
 export const GRAPH_HEIGHT = 350;
 export const NODE_H = 64;
-export const NODE_W = 144;
-export const NODE_W_WIDE = 170;
+export const NODE_W = 138;
+export const NODE_W_WIDE = 164;
 
 export const LANE_Y = {
   recorder: 56,
@@ -18,27 +18,27 @@ export interface Point {
 }
 
 export const GRAPH_NODE_LAYOUT = {
-  discover: { x: 36, y: LANE_Y.recorder, width: NODE_W, height: NODE_H },
-  parse: { x: 224, y: LANE_Y.recorder, width: NODE_W, height: NODE_H },
-  normalize: { x: 412, y: LANE_Y.recorder, width: NODE_W, height: NODE_H },
+  discover: { x: 24, y: LANE_Y.recorder, width: NODE_W, height: NODE_H },
+  parse: { x: 198, y: LANE_Y.recorder, width: NODE_W, height: NODE_H },
+  normalize: { x: 372, y: LANE_Y.recorder, width: NODE_W, height: NODE_H },
   replayOutput: {
-    x: 610,
+    x: 552,
     y: LANE_Y.recorder,
     width: NODE_W_WIDE,
     height: NODE_H,
   },
-  agentEvents: { x: 412, y: LANE_Y.captured, width: NODE_W, height: NODE_H },
+  agentEvents: { x: 372, y: LANE_Y.captured, width: NODE_W, height: NODE_H },
   commandsTools: {
-    x: 610,
+    x: 552,
     y: LANE_Y.captured,
     width: NODE_W_WIDE,
     height: NODE_H,
   },
-  fileChanges: { x: 820, y: LANE_Y.captured, width: NODE_W, height: NODE_H },
-  correlate: { x: 224, y: LANE_Y.repository, width: NODE_W, height: NODE_H },
-  gitState: { x: 412, y: LANE_Y.repository, width: NODE_W, height: NODE_H },
+  fileChanges: { x: 748, y: LANE_Y.captured, width: NODE_W, height: NODE_H },
+  correlate: { x: 198, y: LANE_Y.repository, width: NODE_W, height: NODE_H },
+  gitState: { x: 372, y: LANE_Y.repository, width: NODE_W, height: NODE_H },
   diffCapture: {
-    x: 610,
+    x: 552,
     y: LANE_Y.repository,
     width: NODE_W_WIDE,
     height: NODE_H,

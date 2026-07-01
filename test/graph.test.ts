@@ -38,11 +38,35 @@ describe("execution graph", () => {
       "correlate:replay-output",
     );
     expect(graph.nodes.find((n) => n.id === "commands")?.subtitle).toBe(
-      "Tools and tests",
+      "1 failed test",
     );
     expect(graph.nodes.find((n) => n.title === "Validate")).toBeUndefined();
     expect(graph.nodes.find((n) => n.title === "Review")).toBeUndefined();
     expect(graph.nodes.find((n) => n.title === "Finalize")).toBeUndefined();
+  });
+
+  it("keeps graph visible copy compact", async () => {
+    const s = await parseClaudeSession(fx("claude/realistic-transcript.jsonl"));
+    const graph = deriveExecutionGraph({
+      session: s,
+      git: null,
+      outputWritten: true,
+      htmlValid: true,
+    });
+    const maxSubtitleLength = 24;
+    for (const node of graph.nodes) {
+      expect(node.title.length).toBeLessThanOrEqual(18);
+      if (node.subtitle) {
+        expect(node.subtitle.length).toBeLessThanOrEqual(maxSubtitleLength);
+      }
+    }
+    const commandsNode = graph.nodes.find((n) => n.id === "commands");
+    expect(commandsNode?.title).toBe("Commands");
+    expect(commandsNode?.subtitle).toMatch(
+      /Tools and tests|failed test|failed cmd|No commands|N\/A/,
+    );
+    expect(commandsNode?.title).not.toContain("/");
+    expect(commandsNode?.subtitle).not.toContain("/");
   });
 
   it("does not spread captured command failures to unrelated nodes or links", async () => {

@@ -22,7 +22,7 @@ const statusCard = (vm: ReplayDashboardViewModel, m: MetricCardViewModel) => {
 };
 
 const normalCard = (m: MetricCardViewModel) =>
-  `<article class="metric-card ${m.tone ?? ""} ${m.id === "runid" ? "run-id" : ""}"><div class="metric-label">${icon(m.icon)}<span>${escapeHtml(m.label)}</span></div><div class="metric-value">${escapeHtml(m.value)}</div><div class="metric-sub">${escapeHtml(m.subvalue ?? "")}</div>${m.id === "tokens" && m.telemetryAvailable ? '<svg class="spark" viewBox="0 0 92 24"><path d="M2 18 C22 6 42 22 62 9 S82 16 90 7"/></svg>' : ""}</article>`;
+  `<article class="metric-card ${m.tone ?? ""} ${m.id === "runid" ? "run-id" : ""} ${m.empty ? "is-empty" : ""}"><div class="metric-label">${icon(m.icon)}<span>${escapeHtml(m.label)}</span></div><div class="metric-value" data-empty="${m.empty ? "true" : "false"}">${escapeHtml(m.value)}</div><div class="metric-sub">${escapeHtml(m.subvalue ?? "")}</div>${m.id === "tokens" && m.telemetryAvailable ? '<svg class="spark" viewBox="0 0 92 24"><path d="M2 18 C22 6 42 22 62 9 S82 16 90 7"/></svg>' : ""}</article>`;
 
 export const metricCards = (vm: ReplayDashboardViewModel) =>
   `<section class="metric-grid">${vm.metrics.map((m) => (m.id === "status" ? statusCard(vm, m) : normalCard(m))).join("")}</section>`;

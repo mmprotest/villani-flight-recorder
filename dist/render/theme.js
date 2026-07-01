@@ -248,13 +248,22 @@ h1 {
 .metric-value {
   margin-top: 10px;
   font-size: 16px;
-  font-weight: 800;
+  font-weight: 760;
+  color: var(--text);
   letter-spacing: -0.01em;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
+.metric-card.is-empty .metric-value {
+  font-size: 13px;
+  font-weight: 650;
+  color: var(--text-muted);
+}
+.metric-card.is-empty .metric-sub {
+  color: var(--text-dim);
+}
 .metric-sub {
   margin-top: 5px;
   color: #8796aa;
@@ -358,7 +367,7 @@ h1 {
   position: sticky;
   left: 0;
   right: 0;
-  z-index: 3;
+  z-index: 1;
   display: block;
   height: 18px;
   pointer-events: none;
@@ -375,6 +384,8 @@ h1 {
 }
 
 .timeline-row {
+  position: relative;
+  z-index: 2;
   display: grid;
   grid-template-columns: 76px 28px minmax(0, 1fr);
   column-gap: 8px;
@@ -490,7 +501,7 @@ h1 {
 .execution-graph-stage {
   position: relative;
   height: 350px;
-  width: 1040px;
+  width: min(100%, 980px);
   margin: 0 auto;
 }
 
@@ -506,7 +517,7 @@ h1 {
 .graph-links {
   position: absolute;
   inset: 0;
-  width: 1040px;
+  width: 980px;
   height: 350px;
   overflow: visible;
 }
@@ -755,9 +766,17 @@ h1 {
   overflow: auto;
 }
 
+.detail-event-layout {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.9fr) minmax(520px, 1.6fr);
+  grid-template-rows: auto auto;
+  gap: 10px 12px;
+  min-height: 0;
+}
+.detail-summary { min-width: 0; }
 .detail-hero {
   display: grid;
-  grid-template-columns: 54px minmax(230px, 0.78fr) minmax(420px, 1.35fr);
+  grid-template-columns: 54px minmax(0, 1fr);
   align-items: start;
   gap: 12px;
 }
@@ -793,13 +812,27 @@ h1 {
   text-transform: uppercase;
 }
 
-.meta-grid {
+.metadata-strip {
+  grid-column: 1 / -1;
   display: grid;
-  grid-template-columns: 92px minmax(0, 1fr);
-  gap: 6px 10px;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 8px;
+}
+.meta-grid {
+  display: contents;
   font-size: 12px;
 }
+.meta-item {
+  border: 1px solid rgba(124, 170, 220, 0.10);
+  border-radius: 9px;
+  padding: 7px 8px;
+  min-width: 0;
+  background: rgba(8, 19, 31, 0.35);
+}
 
+.meta-item b {
+  display: block;
+}
 .meta-grid b {
   color: var(--text-muted);
   font-size: 10px;
@@ -808,6 +841,7 @@ h1 {
 }
 
 .meta-grid span {
+  display: block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -845,12 +879,12 @@ h1 {
 
 
 .graph-panel {
-  border-color: rgba(132, 190, 255, 0.24);
-  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 20px 70px rgba(0,0,0,0.28), 0 0 34px rgba(59,153,255,0.08);
+  border-color: rgba(132, 190, 255, 0.25);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 22px 72px rgba(0,0,0,0.30), 0 0 34px rgba(59,153,255,0.085);
 }
-.timeline-panel { border-color: rgba(124, 170, 220, 0.14); box-shadow: inset 0 1px 0 rgba(255,255,255,0.035); }
-.metric-card { border-color: rgba(124, 170, 220, 0.13); box-shadow: inset 0 1px 0 rgba(255,255,255,0.035); }
-.detail-panel { border-color: rgba(124, 170, 220, 0.16); background: rgba(5, 14, 24, 0.88); }
+.timeline-panel { border-color: rgba(124, 170, 220, 0.12); box-shadow: inset 0 1px 0 rgba(255,255,255,0.03); }
+.metric-card { border-color: rgba(124, 170, 220, 0.12); box-shadow: inset 0 1px 0 rgba(255,255,255,0.035); }
+.detail-panel { border-color: rgba(124, 170, 220, 0.15); background: rgba(5, 14, 24, 0.90); }
 
 /* =========================================================
    Code blocks
@@ -898,8 +932,13 @@ h1 {
   overflow: hidden;
   text-overflow: ellipsis;
 }
-.graph-node.lane-dimmed { opacity: 0.52; }
-.graph-node.lane-emphasis { border-color: rgba(132, 190, 255, 0.28); }
+.graph-node.lane-dimmed { opacity: 0.46; }
+.graph-link.lane-dimmed { opacity: 0.42; stroke-dasharray: 5 6; }
+.graph-lane-label.lane-dimmed { opacity: 0.46; }
+.graph-node.lane-emphasis { border-color: rgba(132, 190, 255, 0.34); }
+.graph-lane-label.lane-emphasis { color: rgba(184, 213, 255, 0.86); }
+.timeline-list::before, .timeline-list::after { opacity: 0.22; }
+.timeline-row article { position: relative; z-index: 2; }
 
 /* =========================================================
    Responsive
