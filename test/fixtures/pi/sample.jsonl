@@ -1,0 +1,6 @@
+{"kind":"user_message","conversation_id":"p","time":"2026-01-01T00:00:00Z","repo_path":"/repo","text":"Read README"}
+{"kind":"agent_message","text":"Reading"}
+{"kind":"tool","tool_name":"read_file","args":{"path":"README.md"}}
+{"kind":"tool","tool_name":"write_file","args":{"path":"README.md"}}
+{"kind":"error","error":"failed"}
+{"weird":123}

@@ -1,0 +1,6 @@
+{"role":"user","sessionId":"x","ts":"2026-01-01T00:00:00Z","cwd":"/repo","content":"Run tests"}
+{"role":"assistant","content":"Running tests"}
+{"event":"tool_call","name":"shell","arguments":{"command":"npm test"}}
+{"event":"tool_result","stdout":"fail","stderr":"boom","exitCode":1}
+{"event":"file_write","path":"package.json","content":"{}"}
+{"event":"unknown_new_shape","payload":true}
