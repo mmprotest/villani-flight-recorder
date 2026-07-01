@@ -1,0 +1,5 @@
+export type Provider = "claude" | "codex" | "pi" | "git" | "unknown";
+export type FlightEventType = "session_start"|"session_end"|"user_message"|"assistant_message"|"tool_call"|"tool_result"|"file_read"|"file_write"|"file_edit"|"file_delete"|"bash_command"|"test_run"|"approval"|"error"|"diff"|"git_commit"|"git_status"|"unknown";
+export interface FlightEvent { id:string; provider:Provider; sessionId?:string; timestamp?:string; cwd?:string; type:FlightEventType; title:string; summary?:string; path?:string; command?:string; exitCode?:number; durationMs?:number; stdout?:string; stderr?:string; diff?:string; raw?:unknown; warnings?:string[]; }
+export interface ParsedSession { provider:Provider; path?:string; sessionId?:string; cwd?:string; model?:string; startedAt?:string; endedAt?:string; events:FlightEvent[]; warnings:string[]; }
+export interface SessionCandidate { provider:Provider; path:string; mtimeMs:number; size:number; cwd?:string; sessionId?:string; eventCount?:number; warnings:string[]; }

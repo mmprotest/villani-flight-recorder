@@ -1,0 +1,26 @@
+import fs from "node:fs/promises";
+import path from "node:path";
+import fg from "fast-glob";
+import { expandHome } from "../utils/paths.js";
+import { parseClaudeSession } from "../providers/claude.js";
+import { parseCodexSession } from "../providers/codex.js";
+import { parsePiSession } from "../providers/pi.js";
+const parsers = { claude: parseClaudeSession, codex: parseCodexSession, pi: parsePiSession };
+export async function findSessions(opts = {}) { const roots = opts.roots ?? [expandHome("~/.claude/projects"), path.join(process.env.CODEX_HOME ?? expandHome("~/.codex"), "sessions"), expandHome("~/.codex/sessions"), expandHome("~/.pi/agent/sessions")]; const providers = opts.provider && opts.provider !== "unknown" && opts.provider !== "git" ? [opts.provider] : ["claude", "codex", "pi"]; const out = []; for (const root of roots) {
+    for (const p of providers) {
+        if (!root.toLowerCase().includes(p) && opts.roots == null)
+            continue;
+        const files = await fg("**/*.jsonl", { cwd: root, absolute: true, onlyFiles: true, suppressErrors: true });
+        for (const f of files) {
+            try {
+                const st = await fs.stat(f);
+                const parsed = await parsers[p](f);
+                out.push({ provider: p, path: f, mtimeMs: st.mtimeMs, size: st.size, cwd: parsed.cwd, sessionId: parsed.sessionId, eventCount: parsed.events.length, warnings: parsed.warnings });
+            }
+            catch (e) {
+                out.push({ provider: p, path: f, mtimeMs: 0, size: 0, warnings: [String(e)] });
+            }
+        }
+    }
+} return out.sort((a, b) => b.mtimeMs - a.mtimeMs); }
+export function chooseLatest(s, cwd = process.cwd()) { const match = s.find(x => x.cwd && path.resolve(cwd).startsWith(path.resolve(x.cwd))); return { candidate: match ?? s[0], uncertain: !match }; }

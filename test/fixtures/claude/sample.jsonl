@@ -1,0 +1,8 @@
+{"type":"user","session_id":"c1","timestamp":"2026-01-01T00:00:00Z","cwd":"/repo","message":{"content":"Please edit src/index.ts"}}
+{"type":"assistant","message":{"content":"I will inspect the file."}}
+{"type":"tool_call","tool":"Read","input":{"file_path":"src/index.ts"}}
+{"type":"tool_call","tool":"Edit","input":{"file_path":"src/index.ts"},"content":"replace foo"}
+{"type":"tool_call","tool":"Bash","input":{"command":"npm test"}}
+{"type":"tool_result","stdout":"ok","exit_code":0}
+{"type":"mystery","foo":"bar"}
+not json
