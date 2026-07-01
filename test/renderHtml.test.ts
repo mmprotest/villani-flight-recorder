@@ -22,9 +22,9 @@ describe("rendered HTML", () => {
       "Villani Flight Recorder",
       "Replay Event Timeline",
       "Execution Graph",
-      "STATUS",
-      "REPLAY",
-      "CAPTURED",
+      "Captured run outcome",
+      "events captured",
+      "provider",
       "Commands",
       "Replay Output",
     ])
@@ -46,13 +46,13 @@ describe("rendered HTML", () => {
       expect(html).not.toContain(longGraphCopy);
     }
     expect(html).toContain("Generated with warnings");
-    expect(html).toContain("Failed, 1 failed test");
+    expect(html).toContain("Failed: 1 failed test");
     expect(html).not.toContain("Failed, 1 failed tests");
     expect(html).toContain("Recorder Pipeline");
     expect(html).toContain("Captured Run");
     expect(html).toContain("Repository");
     expect(html).toContain("Design tokens");
-    expect(html).toContain("Metric cards");
+    expect(html).toContain("Investigation report layout");
     expect(html).toContain("Execution graph");
     expect(html).toContain("Detail panel");
     expect(html).not.toMatch(/https?:\/\//);
@@ -76,14 +76,11 @@ describe("rendered HTML", () => {
       times.every((t) => !t.includes("T") && !/\d{4}-\d{2}-\d{2}/.test(t)),
     ).toBe(true);
     expect(doc.querySelectorAll(".graph-node-title").length).toBeGreaterThan(0);
-    expect(
-      doc.querySelectorAll(
-        ".metric-card.is-empty .metric-value[data-empty='true']",
-      ).length,
-    ).toBeGreaterThan(0);
+    expect(doc.querySelector(".run-summary h2")?.textContent).toMatch(
+      /Failed|Succeeded|Warning|Not applicable/,
+    );
     expect(doc.querySelector(".graph-stage")).toBeTruthy();
     expect(html).toContain("z-index: 1");
-    expect(html).toContain("z-index: 2");
     expect(
       [...doc.querySelectorAll(".graph-node-title")].some(
         (n) => n.textContent === "Commands",
@@ -91,7 +88,7 @@ describe("rendered HTML", () => {
     ).toBe(true);
     expect(
       [...doc.querySelectorAll(".graph-node-subtitle")].some((n) =>
-        /Tools and tests|failed test|failed cmd|No commands|N\/A/.test(
+        /Tools and tests|failed test|failed cmd|No commands|No command/.test(
           n.textContent ?? "",
         ),
       ),
@@ -105,6 +102,9 @@ describe("rendered HTML", () => {
     expect(doc.body.textContent).toContain("Impact");
     expect(doc.body.textContent).toContain("Replay Impact");
     expect(doc.body.textContent).toContain("Captured Run Impact");
+    expect(html).not.toContain("N/A NO REPO");
+    expect(html).toContain("@media (max-width: 900px)");
+    expect(html).toContain("@media (max-width: 520px)");
 
     const failed = [
       ...doc.querySelectorAll<HTMLElement>("[data-event-index]"),

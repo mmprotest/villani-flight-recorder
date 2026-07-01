@@ -1,18 +1,26 @@
 import { escapeHtml } from "../safeHtml.js";
 import { icon } from "./icons.js";
-const statusDot = (tone) => `<span class="status-dot ${tone ?? "info"}"></span>`;
-const statusCard = (vm, m) => {
-    const capturedTone = vm.capturedRunStatus.tone === "error"
-        ? "error"
-        : vm.capturedRunStatus.tone === "warning"
-            ? "warning"
-            : vm.capturedRunStatus.status === "not_applicable"
-                ? "info"
-                : "success";
-    const capturedValue = vm.capturedRunStatus.status === "not_applicable"
-        ? vm.capturedRunStatus.label
-        : `${vm.capturedRunStatus.label}${vm.capturedRunStatus.reason ? `, ${vm.capturedRunStatus.reason}` : ""}`;
-    return `<article class="metric-card status-card ${m.tone ?? ""}"><div class="metric-label">${icon(m.icon)}<span>${escapeHtml(m.label)}</span></div><div class="status-card-body"><div class="status-stack-row"><div class="status-stack-label">${statusDot(m.tone)}REPLAY</div><div class="status-stack-value">${escapeHtml(vm.replayStatus.label)}</div></div><div class="status-stack-row"><div class="status-stack-label">${statusDot(capturedTone)}CAPTURED</div><div class="status-stack-value">${escapeHtml(capturedValue)}</div></div></div></article>`;
+const metric = (metrics, id) => metrics.find((m) => m.id === id);
+const capturedToneClass = (vm) => vm.capturedRunStatus.tone === "error"
+    ? "error"
+    : vm.capturedRunStatus.tone === "warning"
+        ? "warning"
+        : vm.capturedRunStatus.status === "not_applicable"
+            ? "info"
+            : "success";
+const value = (m) => escapeHtml(m?.value ?? "Not captured");
+const subvalue = (m) => escapeHtml(m?.subvalue ?? "");
+export const metricCards = (vm) => {
+    const task = metric(vm.metrics, "task");
+    const model = metric(vm.metrics, "model");
+    const runner = metric(vm.metrics, "runner");
+    const tokens = metric(vm.metrics, "tokens");
+    const cost = metric(vm.metrics, "cost");
+    const duration = metric(vm.metrics, "duration");
+    const runId = metric(vm.metrics, "runid");
+    const captured = vm.capturedRunStatus;
+    const outcomeText = captured.status === "not_applicable"
+        ? captured.label
+        : `${captured.label}${captured.reason ? `: ${captured.reason}` : ""}`;
+    return `<section class="run-summary ${capturedToneClass(vm)}" aria-label="Captured run summary"><div class="outcome-card"><div class="outcome-kicker">Captured run outcome</div><h2>${escapeHtml(outcomeText)}</h2><p>${escapeHtml(vm.replayStatus.label)}${vm.warnings.length ? ` with ${vm.warnings.length} recorder warning${vm.warnings.length === 1 ? "" : "s"}` : ""}</p></div><div class="summary-facts"><article><b>${escapeHtml(String(vm.rawEvents.length))}</b><span>events captured</span></article><article><b>${value(runner)}</b><span>provider</span></article><article><b>${value(model)}</b><span>${subvalue(model) || "model"}</span></article><article><b>${value(duration)}</b><span>duration</span></article></div><dl class="metadata-row"><div><dt>Task</dt><dd>${value(task)}</dd></div><div><dt>Run ID</dt><dd class="mono">${value(runId)}</dd></div><div><dt>Tokens</dt><dd>${tokens?.empty ? "Not captured" : value(tokens)}</dd></div><div><dt>Cost</dt><dd>${cost?.empty ? "Not captured" : value(cost)}</dd></div></dl><div class="summary-note">${icon(capturedToneClass(vm) === "error" ? "x" : capturedToneClass(vm) === "warning" ? "warn" : "check")}<span>Captured agent-run evidence is prioritized below. Recorder diagnostics remain available in the diagnostics section.</span></div></section>`;
 };
-const normalCard = (m) => `<article class="metric-card ${m.tone ?? ""} ${m.id === "runid" ? "run-id" : ""} ${m.empty ? "is-empty" : ""}"><div class="metric-label">${icon(m.icon)}<span>${escapeHtml(m.label)}</span></div><div class="metric-value" data-empty="${m.empty ? "true" : "false"}">${escapeHtml(m.value)}</div><div class="metric-sub">${escapeHtml(m.subvalue ?? "")}</div>${m.id === "tokens" && m.telemetryAvailable ? '<svg class="spark" viewBox="0 0 92 24"><path d="M2 18 C22 6 42 22 62 9 S82 16 90 7"/></svg>' : ""}</article>`;
-export const metricCards = (vm) => `<section class="metric-grid">${vm.metrics.map((m) => (m.id === "status" ? statusCard(vm, m) : normalCard(m))).join("")}</section>`;

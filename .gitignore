@@ -1,3 +1,5 @@
 node_modules/
 .villani-flight-recorder/replays/
 .villani-flight-recorder/hooks/
+
+.villani-flight-recorder/screenshots/

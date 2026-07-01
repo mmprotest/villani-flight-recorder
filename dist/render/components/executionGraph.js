@@ -15,6 +15,14 @@ function linkPath(linkId, from, to) {
         return elbowLink(from, to, { viaY: 250 });
     return horizontalLink(from, to);
 }
+const badge = (n) => n.badgeLabel ||
+    (n.status === "failed"
+        ? "Failed"
+        : n.status === "warning"
+            ? "Warning"
+            : n.status === "skipped"
+                ? "Skipped"
+                : "Complete");
 export const executionGraph = (vm) => {
     const by = Object.fromEntries(vm.graph.nodes.map((n) => [n.id, n]));
     const markers = ["completed", "running", "warning", "failed", "pending"]
@@ -27,5 +35,5 @@ export const executionGraph = (vm) => {
     ]
         .map(([label, y]) => `<span class="graph-lane-label ${label === "Repository" ? `lane-${vm.graph.nodes.find((n) => n.id === "git-state")?.laneTone ?? "normal"}` : label === "Captured Run" ? `lane-${vm.graph.nodes.find((n) => n.id === "commands")?.laneTone ?? "normal"}` : "lane-normal"}" style="top:${y}px">${label}</span>`)
         .join("");
-    return `<section class="panel graph-panel"><div class="panel-head"><div><h2>Execution Graph</h2><p>Recorder pipeline, captured run, and repository reconstruction</p></div><div class="graph-controls"><button>Fit</button><button class="icon-only">${icon("minus")}</button><span>100%</span><button class="icon-only">${icon("plus")}</button><button class="icon-only">${icon("fullscreen")}</button></div></div><div class="execution-graph-stage graph-stage">${laneLabels}<svg class="graph-links" viewBox="0 0 ${GRAPH_WIDTH} ${GRAPH_HEIGHT}" aria-hidden="true"><defs>${markers}</defs>${vm.graph.links.map((l) => `<path class="graph-link ${l.status} ${l.laneTone ? `lane-${l.laneTone}` : ""}" marker-end="url(#arrow-${l.status})" d="${linkPath(l.id, by[l.from], by[l.to])}"></path>`).join("")}</svg>${vm.graph.nodes.map((n, i) => `<button class="graph-node ${n.status} severity-${n.severity ?? "none"} ${n.laneTone ? `lane-${n.laneTone}` : ""} ${n.severity === "unavailable" ? "unavailable" : ""} ${n.severity === "skipped" ? "skipped" : ""}" style="left:${n.x}px;top:${n.y}px;width:${n.width}px;height:${n.height}px" data-graph-index="${i}"><span class="graph-node-main"><span class="node-icon">${icon(n.icon)}</span><b class="graph-node-title">${escapeHtml(n.title)}</b><i class="node-badge ${n.badgeTone ?? ""}">${escapeHtml(n.badgeLabel ?? "") || icon(n.status === "failed" ? "x" : n.status === "warning" ? "warn" : n.status === "skipped" ? "skip" : "check")}</i></span><small class="graph-node-subtitle">${escapeHtml(n.subtitle)}</small>${n.severity === "minor-warning" ? '<span class="minor-warning-dot"></span>' : ""}</button>`).join("")}</div><div class="graph-legend">${vm.graph.legend.map((l) => `<span><i class="l-${l.status}"></i>${l.label}</span>`).join("")}</div></section>`;
+    return `<section class="panel graph-panel"><details class="diagnostics-details" open><summary>Recorder pipeline diagnostics and execution graph</summary><div class="panel-head"><div><h2>Execution Graph</h2><p>Secondary view linking recorder phases to captured run evidence and repository state.</p></div></div><div class="graph-scroll"><div class="execution-graph-stage graph-stage">${laneLabels}<svg class="graph-links" viewBox="0 0 ${GRAPH_WIDTH} ${GRAPH_HEIGHT}" aria-hidden="true"><defs>${markers}</defs>${vm.graph.links.map((l) => `<path class="graph-link ${l.status} ${l.laneTone ? `lane-${l.laneTone}` : ""}" marker-end="url(#arrow-${l.status})" d="${linkPath(l.id, by[l.from], by[l.to])}"></path>`).join("")}</svg>${vm.graph.nodes.map((n, i) => `<button class="graph-node ${n.status} severity-${n.severity ?? "none"} ${n.laneTone ? `lane-${n.laneTone}` : ""} ${n.severity === "unavailable" ? "unavailable" : ""} ${n.severity === "skipped" ? "skipped" : ""}" style="left:${n.x}px;top:${n.y}px;width:${n.width}px;min-height:${Math.max(n.height, 86)}px" data-graph-index="${i}"><span class="graph-node-main"><span class="node-icon">${icon(n.icon)}</span><b class="graph-node-title">${escapeHtml(n.title)}</b><small class="graph-node-subtitle">${escapeHtml(n.subtitle ?? "")}</small></span><i class="node-badge ${n.badgeTone ?? ""}">${escapeHtml(badge(n))}</i></button>`).join("")}</div></div><div class="graph-legend">${vm.graph.legend.map((l) => `<span><i class="l-${l.status}"></i>${l.label}</span>`).join("")}</div></details></section>`;
 };
