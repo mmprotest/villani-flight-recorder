@@ -3,6 +3,7 @@ import fs from "node:fs/promises";
 import path from "node:path";
 import os from "node:os";
 import { execFile } from "node:child_process";
+import vm from "node:vm";
 import { promisify } from "node:util";
 import { readJsonl } from "../src/utils/jsonl.js";
 import { parseClaudeSession } from "../src/providers/claude.js";
@@ -138,13 +139,38 @@ describe("cli support", () => {
     expect(red).toContain("[REDACTED_CONNECTION_STRING]");
     expect(red).toContain("[REDACTED_SECRET]");
   });
-  it("replay html is self-contained and includes investigation summary/risk flags", async () => {
+  it("replay html renders the operational cockpit self-contained with valid inline javascript", async () => {
     const s = await parseCodexSession(fx("codex/realistic-rollout.jsonl"));
     const htmlPath = await renderReplay(s, { cwd: process.cwd() });
     const html = await fs.readFile(htmlPath, "utf8");
-    expect(html).toContain("Run Summary");
-    expect(html).toContain("Risk flags");
+    expect(html).toContain("Villani Flight Recorder");
+    expect(html).toContain("Live Event Timeline");
+    expect(html).toContain("Execution Graph");
+    expect(html).toContain("Event Detail");
+    expect(html).toContain("Changed Files");
+    expect(html).toContain("Diff");
+    expect(html).toContain("Raw JSON");
+    expect(html).toContain("TASK");
+    expect(html).toContain("MODEL");
+    expect(html).toContain("RUNNER");
+    expect(html).toContain("TOKENS");
+    expect(html).toContain("COST (USD)");
+    expect(html).toContain("STATUS");
+    expect(html).toContain("DURATION");
+    expect(html).toContain("RUN ID");
+    expect(html).toContain("Discover");
+    expect(html).toContain("Parse");
+    expect(html).toContain("Normalize");
+    expect(html).toContain("Correlate");
+    expect(html).toContain("Ran npm test");
     expect(html).not.toMatch(/https?:\/\//);
+    const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(
+      (match) => match[1],
+    );
+    expect(scripts.length).toBeGreaterThan(0);
+    for (const script of scripts) {
+      expect(() => new vm.Script(script)).not.toThrow();
+    }
   });
   it("git replay works in a temporary git repo and CLI invalid input exits nonzero", async () => {
     const d = await fs.mkdtemp(path.join(os.tmpdir(), "vfr-"));
