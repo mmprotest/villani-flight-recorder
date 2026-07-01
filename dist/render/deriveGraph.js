@@ -81,11 +81,13 @@ export function deriveExecutionGraph(input) {
             : captured.totalCommands || captured.totalTests
                 ? "none"
                 : "unavailable";
-    const fileSeverity = captured.status === "not_applicable"
+    const fileSeverity = captured.status === "not_applicable" && diffOk
         ? "none"
-        : captured.fileEdits
-            ? "none"
-            : "unavailable";
+        : captured.status === "not_applicable"
+            ? "unavailable"
+            : captured.fileEdits
+                ? "none"
+                : "unavailable";
     const outputSeverity = ["render_failed", "write_failed"].includes(replayStatus.status)
         ? "failed"
         : replayStatus.status === "generated_with_warnings" ||
@@ -148,12 +150,12 @@ export function deriveExecutionGraph(input) {
         "discover:parse",
         "parse:normalize",
         "normalize:correlate",
+        "correlate:replay-output",
         "normalize:agent-events",
         "agent-events:commands",
         "commands:file-changes",
         "commands:git-state",
         "git-state:diff-capture",
-        "diff-capture:replay-output",
     ];
     const links = pairs.map((s, i) => {
         const [from, to] = s.split(":");
