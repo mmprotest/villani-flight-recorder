@@ -1,5 +1,5 @@
 import { GitInfo } from "../git/gitInfo.js";
-import { FlightEvent, ParsedSession } from "../providers/types.js";
+import { ParsedSession } from "../providers/types.js";
 import { IconName } from "./components/icons.js";
 import { GRAPH_COORDS } from "./graphGeometry.js";
 import {
@@ -9,15 +9,21 @@ import {
   Severity,
   Status,
 } from "./viewModel.js";
+import {
+  CapturedRunStatusSummary,
+  ReplayStatusSummary,
+} from "./statusTypes.js";
+import { deriveCapturedRunStatus } from "./deriveCapturedRunStatus.js";
+import { deriveReplayStatus } from "./deriveReplayStatus.js";
 
 export interface GraphDerivationInput {
   session: ParsedSession;
   git: GitInfo | null;
   htmlValid?: boolean;
   outputWritten?: boolean;
+  replayStatus?: ReplayStatusSummary;
+  capturedRunStatus?: CapturedRunStatusSummary;
 }
-const failed = (events: FlightEvent[]) =>
-  events.some((e) => e.type === "error" || (e.exitCode ?? 0) !== 0);
 const gitAvailable = (git: GitInfo | null) =>
   Boolean(git?.head || git?.status || git?.diff || git?.diffStat);
 const statusFromSeverity = (s: Severity): Status =>
@@ -84,34 +90,54 @@ export function deriveExecutionGraph(
   const diffOk = Boolean(
     git?.diff || git?.diffStat || events.some((e) => e.diff),
   );
-  const hasFail = failed(events);
-  const hasReview = events.some((e) =>
-    /review/i.test(`${e.type} ${e.title} ${e.summary ?? ""}`),
-  );
-  const reviewFail = events.some(
-    (e) =>
-      /review/i.test(`${e.type} ${e.title}`) &&
-      ((e.exitCode ?? 0) !== 0 || e.type === "error"),
-  );
+  const replayStatus =
+    input.replayStatus ??
+    deriveReplayStatus({
+      events,
+      warnings,
+      unknownEventsCount: unknown,
+      outputWritten: input.outputWritten,
+      htmlValidated: input.htmlValid,
+    });
+  const captured = input.capturedRunStatus ?? deriveCapturedRunStatus(events);
   const parseSeverity: Severity =
-    events.length === 0
+    replayStatus.status === "parse_failed"
       ? "failed"
       : warnings.length === 0
         ? "none"
         : warnings.length <= 2
           ? "minor-warning"
           : "warning";
-  const sessionSeverity: Severity =
-    events.length === 0
-      ? "failed"
-      : unknown > known
-        ? "warning"
-        : unknown > 0
-          ? "minor-warning"
-          : "none";
-  const validateSeverity: Severity = hasFail
+  const agentSeverity: Severity =
+    captured.status === "not_applicable"
+      ? "skipped"
+      : events.length === 0
+        ? "unavailable"
+        : unknown > known
+          ? "warning"
+          : unknown > 0
+            ? "minor-warning"
+            : "none";
+  const commandSeverity: Severity =
+    captured.status === "not_applicable"
+      ? "skipped"
+      : captured.failedCommands || captured.failedTests
+        ? "failed"
+        : captured.totalCommands || captured.totalTests
+          ? "none"
+          : "unavailable";
+  const fileSeverity: Severity =
+    captured.status === "not_applicable"
+      ? "none"
+      : captured.fileEdits
+        ? "none"
+        : "unavailable";
+  const outputSeverity: Severity = ["render_failed", "write_failed"].includes(
+    replayStatus.status,
+  )
     ? "failed"
-    : warnings.length || unknown
+    : replayStatus.status === "generated_with_warnings" ||
+        replayStatus.status === "partial"
       ? "minor-warning"
       : "none";
   const nodes = [
@@ -128,7 +154,9 @@ export function deriveExecutionGraph(
       "parse",
       "Parse",
       parseSeverity,
-      `${events.length} events`,
+      warnings.length
+        ? `Parsed with ${warnings.length} warnings`
+        : `${events.length} events`,
       "parse",
       parseSeverity === "minor-warning" ? "partial" : undefined,
     ),
@@ -136,30 +164,72 @@ export function deriveExecutionGraph(
       "normalize",
       "Normalize",
       events.length ? "none" : "failed",
-      events.length ? "timeline events" : "empty timeline",
+      events.length ? "normalized events" : "empty timeline",
       "normalize",
     ),
     node(
       "correlate",
       "Correlate",
       hasGit ? "none" : "unavailable",
-      hasGit ? "git metadata" : "not a git repo",
+      hasGit ? "repo metadata" : "not a git repo",
       "correlate",
       hasGit ? undefined : "not captured",
     ),
     node(
-      "session-events",
-      "Session Events",
-      sessionSeverity,
-      unknown ? `${unknown} unknown records` : `${events.length} known`,
+      "agent-events",
+      "Agent Events",
+      agentSeverity,
+      captured.status === "not_applicable"
+        ? "Git-only replay"
+        : unknown
+          ? `${events.length} events, ${unknown} unknown`
+          : `${events.length} events captured`,
       "terminal",
-      sessionSeverity === "minor-warning" ? "partial" : undefined,
+      captured.status === "not_applicable"
+        ? "N/A"
+        : agentSeverity === "minor-warning"
+          ? "partial"
+          : undefined,
+    ),
+    node(
+      "commands",
+      "Commands / Tools",
+      commandSeverity,
+      captured.status === "not_applicable"
+        ? "Not captured"
+        : captured.failedTests
+          ? `${captured.failedTests} failed tests`
+          : captured.failedCommands
+            ? `${captured.failedCommands} failed commands`
+            : captured.totalCommands || captured.totalTests
+              ? "commands passed"
+              : "no command data",
+      "terminal",
+      captured.status === "not_applicable"
+        ? "N/A"
+        : commandSeverity === "failed"
+          ? "FAILED"
+          : commandSeverity === "unavailable"
+            ? "N/A"
+            : undefined,
+    ),
+    node(
+      "file-changes",
+      "File Changes",
+      fileSeverity,
+      captured.status === "not_applicable"
+        ? "From commits"
+        : captured.fileEdits
+          ? `${captured.fileEdits} edits captured`
+          : "none captured",
+      "edit",
+      fileSeverity === "unavailable" ? "N/A" : undefined,
     ),
     node(
       "git-state",
       "Git State",
       hasGit ? "none" : "unavailable",
-      git?.head ? git.head.slice(0, 12) : "not captured",
+      git?.head ? git.head.slice(0, 12) : "not a git repo",
       "branch",
       hasGit ? undefined : "not captured",
     ),
@@ -167,48 +237,39 @@ export function deriveExecutionGraph(
       "diff-capture",
       "Diff Capture",
       diffOk ? "none" : hasGit ? "minor-warning" : "unavailable",
-      diffOk ? "diff available" : hasGit ? "not captured" : "not a git repo",
+      diffOk
+        ? "diff available"
+        : hasGit
+          ? "no git diff captured"
+          : "no git diff captured",
       "edit",
       diffOk ? undefined : "not captured",
     ),
     node(
-      "validate",
-      "Validate",
-      validateSeverity,
-      hasFail
-        ? "run failed"
-        : validateSeverity === "minor-warning"
-          ? "generated with notes"
-          : "static HTML valid",
-      "shield",
-      validateSeverity === "minor-warning" ? "partial" : undefined,
-    ),
-    node(
-      "review",
-      "Review",
-      hasReview ? (reviewFail ? "failed" : "none") : "skipped",
-      hasReview ? "review captured" : "optional phase",
-      "review",
-      hasReview ? undefined : "skipped",
-    ),
-    node(
-      "finalize",
-      "Finalize",
-      input.outputWritten === false ? "failed" : "none",
-      "HTML written",
+      "replay-output",
+      "Replay Output",
+      outputSeverity,
+      replayStatus.status === "generated"
+        ? "HTML written"
+        : replayStatus.reason,
       "flag",
+      outputSeverity === "failed"
+        ? "FAILED"
+        : outputSeverity === "minor-warning"
+          ? "WARNING"
+          : "COMPLETE",
     ),
   ];
   const pairs = [
     "discover:parse",
     "parse:normalize",
     "normalize:correlate",
-    "normalize:session-events",
-    "session-events:git-state",
+    "normalize:agent-events",
+    "agent-events:commands",
+    "commands:file-changes",
+    "commands:git-state",
     "git-state:diff-capture",
-    "diff-capture:validate",
-    "validate:review",
-    "review:finalize",
+    "diff-capture:replay-output",
   ];
   const links = pairs.map((s, i) => {
     const [from, to] = s.split(":");

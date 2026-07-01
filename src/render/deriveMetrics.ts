@@ -1,5 +1,9 @@
 import { ParsedSession } from "../providers/types.js";
 import { fmtDuration, fmtTime, MetricCardViewModel } from "./viewModel.js";
+import {
+  CapturedRunStatusSummary,
+  ReplayStatusSummary,
+} from "./statusTypes.js";
 const task = (s: ParsedSession) =>
   s.events.find((e) => e.type === "user_message")?.summary ??
   s.events.find((e) => e.type === "user_message")?.title ??
@@ -10,8 +14,8 @@ export const runnerLabel = (p: string) =>
   "Unknown";
 export function deriveMetrics(
   session: ParsedSession,
-  hasFail: boolean,
-  hasWarning: boolean,
+  replayStatus: ReplayStatusSummary,
+  capturedRunStatus: CapturedRunStatusSummary,
 ): MetricCardViewModel[] {
   const dur =
     session.startedAt && session.endedAt
@@ -62,10 +66,22 @@ export function deriveMetrics(
     {
       id: "status",
       label: "STATUS",
-      value: hasFail ? "FAILED" : hasWarning ? "WARNING" : "COMPLETE",
-      subvalue: "Static replay",
-      icon: hasFail ? "x" : hasWarning ? "warn" : "check",
-      tone: hasFail ? "error" : hasWarning ? "warning" : "success",
+      value: replayStatus.label,
+      subvalue: `Captured: ${capturedRunStatus.label} — ${capturedRunStatus.reason}`,
+      icon:
+        replayStatus.tone === "error"
+          ? "x"
+          : replayStatus.tone === "warning"
+            ? "warn"
+            : "check",
+      tone:
+        replayStatus.tone === "error"
+          ? "error"
+          : replayStatus.tone === "warning"
+            ? "warning"
+            : replayStatus.tone === "success"
+              ? "success"
+              : "info",
     },
     {
       id: "duration",

@@ -4,6 +4,12 @@ import { IconName } from "./components/icons.js";
 import { deriveExecutionGraph } from "./deriveGraph.js";
 import { deriveMetrics } from "./deriveMetrics.js";
 import { deriveTimeline } from "./deriveTimeline.js";
+import { deriveReplayStatus } from "./deriveReplayStatus.js";
+import { deriveCapturedRunStatus } from "./deriveCapturedRunStatus.js";
+import {
+  CapturedRunStatusSummary,
+  ReplayStatusSummary,
+} from "./statusTypes.js";
 import { changedFilesFromGit, diffFromGit } from "./deriveDetails.js";
 
 export type Status =
@@ -80,6 +86,8 @@ export interface ReplayDashboardViewModel {
     showProgress: boolean;
     primaryActionLabel: string;
   };
+  replayStatus: ReplayStatusSummary;
+  capturedRunStatus: CapturedRunStatusSummary;
   metrics: MetricCardViewModel[];
   timeline: TimelineEventViewModel[];
   graph: ExecutionGraphViewModel;
@@ -109,9 +117,6 @@ export const fmtDuration = (ms?: number) =>
     : ms < 1000
       ? `${ms}ms`
       : `${(ms / 1000).toFixed(ms < 10000 ? 2 : 1)}s`;
-const failed = (events: FlightEvent[]) =>
-  events.some((e) => e.type === "error" || (e.exitCode ?? 0) !== 0);
-
 export function deriveReplayViewModel(
   session: ParsedSession,
   git: GitInfo | null,
@@ -132,14 +137,15 @@ export function deriveReplayViewModel(
     ...session.warnings,
     ...events.flatMap((e) => e.warnings ?? []),
   ];
-  const hasFail = failed(events);
-  const hasWarning =
-    warnings.length > 2 ||
-    events.filter((e) => e.type === "unknown").length >
-      Math.max(
-        0,
-        events.length - events.filter((e) => e.type === "unknown").length,
-      );
+  const unknownEventsCount = events.filter((e) => e.type === "unknown").length;
+  const replayStatus = deriveReplayStatus({
+    events,
+    warnings,
+    unknownEventsCount,
+    outputWritten: true,
+    htmlValidated: true,
+  });
+  const capturedRunStatus = deriveCapturedRunStatus(events);
   const timeline = deriveTimeline(events);
   return {
     brand: { title: "Villani Flight Recorder", mode: "REPLAY" },
@@ -149,11 +155,15 @@ export function deriveReplayViewModel(
       showProgress: true,
       primaryActionLabel: "Open in Console",
     },
-    metrics: deriveMetrics(normalizedSession, hasFail, hasWarning),
+    replayStatus,
+    capturedRunStatus,
+    metrics: deriveMetrics(normalizedSession, replayStatus, capturedRunStatus),
     timeline,
     graph: deriveExecutionGraph({
       session: normalizedSession,
       git,
+      replayStatus,
+      capturedRunStatus,
       htmlValid: true,
       outputWritten: true,
     }),

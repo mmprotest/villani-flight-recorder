@@ -7,12 +7,12 @@ export const GRAPH_COORDS = {
     parse: { x: 255, y: 52, width: NODE_W, height: NODE_H },
     normalize: { x: 462, y: 52, width: NODE_W, height: NODE_H },
     correlate: { x: 669, y: 52, width: NODE_W, height: NODE_H },
-    "session-events": { x: 462, y: 170, width: NODE_W, height: NODE_H },
-    "git-state": { x: 669, y: 170, width: NODE_W, height: NODE_H },
+    "agent-events": { x: 255, y: 170, width: NODE_W, height: NODE_H },
+    commands: { x: 462, y: 170, width: NODE_W, height: NODE_H },
+    "file-changes": { x: 669, y: 170, width: NODE_W, height: NODE_H },
+    "git-state": { x: 462, y: 288, width: NODE_W, height: NODE_H },
     "diff-capture": { x: 669, y: 288, width: NODE_W, height: NODE_H },
-    validate: { x: 462, y: 288, width: NODE_W, height: NODE_H },
-    review: { x: 255, y: 288, width: NODE_W, height: NODE_H },
-    finalize: { x: 48, y: 288, width: NODE_W, height: NODE_H },
+    "replay-output": { x: 840, y: 288, width: NODE_W, height: NODE_H },
 };
 export function rightCenter(node) {
     return { x: node.x + node.width, y: node.y + node.height / 2 };
