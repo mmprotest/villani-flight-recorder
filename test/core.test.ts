@@ -144,12 +144,14 @@ describe("cli support", () => {
     const htmlPath = await renderReplay(s, { cwd: process.cwd() });
     const html = await fs.readFile(htmlPath, "utf8");
     expect(html).toContain("Villani Flight Recorder");
-    expect(html).toContain("Live Event Timeline");
+    expect(html).toContain("Replay Event Timeline");
     expect(html).toContain("Execution Graph");
     expect(html).toContain("Event Detail");
     expect(html).toContain("Changed Files");
     expect(html).toContain("Diff");
     expect(html).toContain("Raw JSON");
+    expect(html).toContain("Warnings");
+    expect(html).toContain("Redaction");
     expect(html).toContain("TASK");
     expect(html).toContain("MODEL");
     expect(html).toContain("RUNNER");
@@ -162,7 +164,17 @@ describe("cli support", () => {
     expect(html).toContain("Parse");
     expect(html).toContain("Normalize");
     expect(html).toContain("Correlate");
+    expect(html).toContain("Session Events");
+    expect(html).toContain("Git State");
+    expect(html).toContain("Diff Capture");
+    expect(html).toContain("Validate");
+    expect(html).toContain("Review");
+    expect(html).toContain("Finalize");
     expect(html).toContain("Ran npm test");
+    expect(html).toContain("detailContent");
+    expect(html).not.toContain("Live Updates <b>Streaming</b>");
+    expect(html).not.toContain("82%");
+    expect(html).not.toMatch(/Validate[\s\S]{0,400}running/i);
     expect(html).not.toMatch(/https?:\/\//);
     const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(
       (match) => match[1],
