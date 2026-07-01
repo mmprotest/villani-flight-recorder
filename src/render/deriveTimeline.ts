@@ -7,19 +7,46 @@ import {
   TimelineEventViewModel,
 } from "./viewModel.js";
 
+const rawIsError = (e: FlightEvent) =>
+  Boolean(
+    e.raw &&
+    typeof e.raw === "object" &&
+    "is_error" in e.raw &&
+    (e.raw as { is_error?: unknown }).is_error === true,
+  );
 export const eventStatus = (e: FlightEvent): Status =>
-  e.type === "error" || (e.exitCode ?? 0) !== 0 ? "failed" : "completed";
+  e.type === "error" || (e.exitCode ?? 0) !== 0 || rawIsError(e)
+    ? "failed"
+    : "completed";
 export const eventSeverity = (e: FlightEvent): Severity =>
-  e.type === "error" || (e.exitCode ?? 0) !== 0
+  e.type === "error" || (e.exitCode ?? 0) !== 0 || rawIsError(e)
     ? "failed"
     : e.type === "unknown" || (e.warnings?.length ?? 0) > 0
       ? "minor-warning"
       : "none";
 function timelineCopy(e: FlightEvent): { title: string; subtitle: string } {
+  if (e.type === "test_run" && e.command && (e.exitCode ?? 0) !== 0) {
+    return {
+      title: `Test failed: ${e.command}`,
+      subtitle: "Captured test command failed",
+    };
+  }
   if (e.command && (e.exitCode ?? 0) !== 0) {
     return {
       title: `Command failed: ${e.command}`,
       subtitle: "Captured command exited non-zero",
+    };
+  }
+  if (e.type === "error" && e.command) {
+    return {
+      title: `Command failed: ${e.command}`,
+      subtitle: e.summary || "Captured command failed",
+    };
+  }
+  if (e.type === "tool_result" && rawIsError(e)) {
+    return {
+      title: "Tool result failed",
+      subtitle: "Captured tool returned an error",
     };
   }
   if (e.command) {
@@ -78,17 +105,17 @@ export function deriveTimeline(
             ? "Repository reconstruction"
             : "Recorder pipeline",
       impactLabel:
-        (e.exitCode ?? 0) !== 0 || e.type === "error"
+        (e.exitCode ?? 0) !== 0 || e.type === "error" || rawIsError(e)
           ? "Captured run failed"
           : ["git_commit", "git_status", "diff"].includes(e.type)
             ? "Git diff captured"
             : "Replay event recorded",
       replayImpactLabel:
-        (e.exitCode ?? 0) !== 0
+        (e.exitCode ?? 0) !== 0 || rawIsError(e)
           ? "None, replay generated successfully"
           : "Generated",
       capturedImpactLabel:
-        (e.exitCode ?? 0) !== 0
+        (e.exitCode ?? 0) !== 0 || rawIsError(e)
           ? "Failed command/test"
           : e.command
             ? "Command/tool recorded"

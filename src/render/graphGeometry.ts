@@ -1,7 +1,7 @@
 import { GraphNodeViewModel } from "./viewModel.js";
 
 export const GRAPH_WIDTH = 1040;
-export const GRAPH_HEIGHT = 390;
+export const GRAPH_HEIGHT = 410;
 export const NODE_W = 150;
 export const NODE_H = 68;
 
@@ -11,16 +11,16 @@ export interface Point {
 }
 
 export const GRAPH_NODE_LAYOUT = {
-  discover: { x: 40, y: 58, width: NODE_W, height: NODE_H },
-  parse: { x: 240, y: 58, width: NODE_W, height: NODE_H },
-  normalize: { x: 440, y: 58, width: NODE_W, height: NODE_H },
-  correlate: { x: 640, y: 58, width: NODE_W, height: NODE_H },
-  replayOutput: { x: 840, y: 58, width: NODE_W, height: NODE_H },
-  agentEvents: { x: 440, y: 180, width: NODE_W, height: NODE_H },
-  commandsTools: { x: 640, y: 180, width: NODE_W, height: NODE_H },
-  fileChanges: { x: 840, y: 180, width: NODE_W, height: NODE_H },
-  gitState: { x: 640, y: 300, width: NODE_W, height: NODE_H },
-  diffCapture: { x: 840, y: 300, width: NODE_W, height: NODE_H },
+  discover: { x: 40, y: 58, width: 150, height: NODE_H },
+  parse: { x: 235, y: 58, width: 150, height: NODE_H },
+  normalize: { x: 430, y: 58, width: 150, height: NODE_H },
+  replayOutput: { x: 625, y: 58, width: 170, height: NODE_H },
+  agentEvents: { x: 430, y: 180, width: 150, height: NODE_H },
+  commandsTools: { x: 625, y: 180, width: 170, height: NODE_H },
+  fileChanges: { x: 830, y: 180, width: 150, height: NODE_H },
+  correlate: { x: 235, y: 300, width: 150, height: NODE_H },
+  gitState: { x: 430, y: 300, width: 150, height: NODE_H },
+  diffCapture: { x: 625, y: 300, width: 170, height: NODE_H },
 } as const;
 
 export const GRAPH_COORDS: Record<

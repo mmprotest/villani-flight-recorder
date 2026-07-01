@@ -52,7 +52,13 @@ describe("provider parsers", () => {
       s.events.some((e) => e.type === "file_write" && e.path === "src/new.ts"),
     ).toBe(true);
     expect(
-      s.events.some((e) => e.type === "error" && e.summary === "Tests failed"),
+      s.events.some(
+        (e) =>
+          e.type === "test_run" &&
+          e.command === "npm test" &&
+          e.exitCode === 1 &&
+          e.summary === "Tests failed",
+      ),
     ).toBe(true);
     expect(s.events.some((e) => e.title === "Searched with Grep")).toBe(true);
     expect(

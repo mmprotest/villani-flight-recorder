@@ -12,7 +12,16 @@ import { blocks, contentText } from "./helpers/content.js";
 import { timestampOf } from "./helpers/timestamps.js";
 import { classifyTool } from "./helpers/tools.js";
 import { finish } from "./generic.js";
-import { FlightEvent, ParsedSession } from "./types.js";
+import { FlightEvent, FlightEventType, ParsedSession } from "./types.js";
+
+interface ClaudeToolUseMemory {
+  id: string;
+  name: string;
+  command?: string;
+  path?: string;
+  input?: unknown;
+  eventId?: string;
+}
 
 export async function parseClaudeSession(
   sessionPath: string,
@@ -21,6 +30,7 @@ export async function parseClaudeSession(
   const events: FlightEvent[] = [];
   const warnings: string[] = [];
   let n = 0;
+  const toolUsesById = new Map<string, ClaudeToolUseMemory>();
   const push = (e: FlightEvent) =>
     events.push({ ...e, title: e.title || makeHumanEventTitle(e) });
   for (const r of recs) {
@@ -89,25 +99,80 @@ export async function parseClaudeSession(
             { timestamp: ts, sessionId, cwd, summary: text },
           ),
         );
-      for (const b of blocks(content).filter((b) => b.type === "tool_result"))
-        push(
-          event(
-            `claude-${++n}`,
-            "claude",
-            b.is_error ? "error" : "tool_result",
-            b.is_error ? "Tool result error" : "Tool result",
-            r.value,
-            {
-              timestamp: ts,
-              sessionId,
-              cwd,
-              summary: textOf(b.content),
-              warnings: b.is_error
-                ? ["Tool result marked as error"]
-                : undefined,
-            },
-          ),
-        );
+      for (const b of blocks(content).filter((b) => b.type === "tool_result")) {
+        const toolUseId =
+          typeof b.tool_use_id === "string" ? b.tool_use_id : undefined;
+        const remembered = toolUseId ? toolUsesById.get(toolUseId) : undefined;
+        const failed = b.is_error === true;
+        const summary = textOf(b.content);
+        if (remembered) {
+          const isBash =
+            remembered.name.toLowerCase() === "bash" ||
+            Boolean(remembered.command);
+          const isTest = Boolean(
+            remembered.command && isTestCommand(remembered.command),
+          );
+          const type: FlightEventType = isBash
+            ? isTest
+              ? "test_run"
+              : "bash_command"
+            : "tool_result";
+          const title = failed
+            ? isTest
+              ? `Test failed: ${remembered.command}`
+              : remembered.command
+                ? `Command failed: ${remembered.command}`
+                : `${remembered.name} tool failed`
+            : remembered.command
+              ? `Command completed: ${remembered.command}`
+              : `${remembered.name} result`;
+          push(
+            event(
+              `claude-${++n}`,
+              "claude",
+              type,
+              title,
+              {
+                ...b,
+                tool_name: remembered.name,
+                tool_input: remembered.input,
+              },
+              {
+                timestamp: ts,
+                sessionId,
+                cwd,
+                command: remembered.command,
+                path: remembered.path,
+                exitCode: failed && isBash ? 1 : undefined,
+                summary,
+                warnings:
+                  failed && !isBash
+                    ? ["Tool result marked as error"]
+                    : undefined,
+              },
+            ),
+          );
+        } else {
+          push(
+            event(
+              `claude-${++n}`,
+              "claude",
+              failed ? "tool_result" : "tool_result",
+              failed ? "Tool result failed" : "Tool result",
+              b,
+              {
+                timestamp: ts,
+                sessionId,
+                cwd,
+                summary,
+                warnings: failed
+                  ? ["Unmatched tool_result marked as error"]
+                  : undefined,
+              },
+            ),
+          );
+        }
+      }
       continue;
     }
     if (role === "assistant" || o.type === "assistant") {
@@ -132,15 +197,32 @@ export async function parseClaudeSession(
       for (const b of blocks(content).filter((b) => b.type === "tool_use")) {
         const name = String(b.name ?? "tool");
         const c = classifyTool(name, b.input);
-        push(
-          event(`claude-${++n}`, "claude", c.type, c.title ?? "", r.value, {
-            timestamp: ts,
-            sessionId,
-            cwd,
+        const eventId = `claude-${++n}`;
+        if (typeof b.id === "string")
+          toolUsesById.set(b.id, {
+            id: b.id,
+            name,
             command: c.command,
             path: c.path,
-            summary: name,
-          }),
+            input: b.input,
+            eventId,
+          });
+        push(
+          event(
+            eventId,
+            "claude",
+            c.type,
+            c.title ?? "",
+            { ...obj(r.value), tool_use_id: b.id },
+            {
+              timestamp: ts,
+              sessionId,
+              cwd,
+              command: c.command,
+              path: c.path,
+              summary: name,
+            },
+          ),
         );
       }
       continue;
