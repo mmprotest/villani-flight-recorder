@@ -40,11 +40,13 @@ export function deriveMetrics(
         ? "Captured model metadata"
         : `${runnerLabel(session.provider)} session`,
       icon: "model",
+      empty: !session.model,
     },
     {
       id: "runner",
       label: "RUNNER",
       value: runnerLabel(session.provider),
+      empty: !session.provider,
       subvalue: `${session.events.length} events`,
       icon: "runner",
     },
@@ -55,6 +57,7 @@ export function deriveMetrics(
       subvalue: "No token telemetry",
       icon: "tokens",
       telemetryAvailable: false,
+      empty: true,
     },
     {
       id: "cost",
@@ -62,6 +65,7 @@ export function deriveMetrics(
       value: "Not captured",
       subvalue: "No cost telemetry",
       icon: "cost",
+      empty: true,
     },
     {
       id: "status",
@@ -91,6 +95,7 @@ export function deriveMetrics(
         ? `Started ${fmtTime(session.startedAt)}`
         : "No duration captured",
       icon: "clock",
+      empty: dur === "Not captured",
     },
     {
       id: "runid",
@@ -98,6 +103,7 @@ export function deriveMetrics(
       value: session.sessionId ?? "Not captured",
       subvalue: session.sessionId ? "Session identifier" : "No runner metadata",
       icon: "run",
+      empty: !session.sessionId,
     },
   ];
 }

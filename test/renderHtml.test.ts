@@ -26,7 +26,6 @@ describe("rendered HTML", () => {
       "REPLAY",
       "CAPTURED",
       "Commands",
-      "Tools and tests",
       "Replay Output",
     ])
       expect(html).toContain(text);
@@ -37,6 +36,15 @@ describe("rendered HTML", () => {
     expect(html).not.toContain("Streaming");
     expect(html).not.toContain("82%");
     expect(html).not.toContain("Commands / Tools</b>");
+    for (const longGraphCopy of [
+      "Replay HTML written with recorder warnings",
+      "Repository correlation unavailable",
+      "No git diff captured",
+      "Not a git repository",
+      "Events, 1 unknown",
+    ]) {
+      expect(html).not.toContain(longGraphCopy);
+    }
     expect(html).toContain("Generated with warnings");
     expect(html).toContain("Failed, 1 failed test");
     expect(html).not.toContain("Failed, 1 failed tests");
@@ -69,13 +77,23 @@ describe("rendered HTML", () => {
     ).toBe(true);
     expect(doc.querySelectorAll(".graph-node-title").length).toBeGreaterThan(0);
     expect(
+      doc.querySelectorAll(
+        ".metric-card.is-empty .metric-value[data-empty='true']",
+      ).length,
+    ).toBeGreaterThan(0);
+    expect(doc.querySelector(".graph-stage")).toBeTruthy();
+    expect(html).toContain("z-index: 1");
+    expect(html).toContain("z-index: 2");
+    expect(
       [...doc.querySelectorAll(".graph-node-title")].some(
         (n) => n.textContent === "Commands",
       ),
     ).toBe(true);
     expect(
-      [...doc.querySelectorAll(".graph-node-subtitle")].some(
-        (n) => n.textContent === "Tools and tests",
+      [...doc.querySelectorAll(".graph-node-subtitle")].some((n) =>
+        /Tools and tests|failed test|failed cmd|No commands|N\/A/.test(
+          n.textContent ?? "",
+        ),
       ),
     ).toBe(true);
     expect(
@@ -108,6 +126,16 @@ describe("rendered HTML", () => {
     expect(doc.querySelector("#detailContent")?.textContent).toContain(
       "Failed test command",
     );
+    expect(doc.querySelector("#detailContent .metadata-strip")).toBeTruthy();
+    const detailLayout = doc.querySelector(
+      "#detailContent .detail-event-layout",
+    );
+    const children = [...(detailLayout?.children ?? [])].map(
+      (n) => (n as Element).className,
+    );
+    expect(
+      children.findIndex((c) => c.includes("investigation-grid")),
+    ).toBeLessThan(children.findIndex((c) => c.includes("metadata-strip")));
 
     doc.querySelector<HTMLElement>("[data-graph-index]")?.click();
     expect(doc.querySelector("#detailContent")?.textContent).toContain(
