@@ -3,6 +3,7 @@ import fs, { mkdtemp, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import vm from "node:vm";
+import { JSDOM } from "jsdom";
 import { parseClaudeSession } from "../src/providers/claude.js";
 import { parseCodexSession } from "../src/providers/codex.js";
 import { renderReplay } from "../src/render/renderReplay.js";
@@ -24,7 +25,8 @@ describe("rendered HTML", () => {
       "STATUS",
       "REPLAY",
       "CAPTURED",
-      "Commands / Tools",
+      "Commands",
+      "Tools and tests",
       "Replay Output",
     ])
       expect(html).toContain(text);
@@ -34,9 +36,89 @@ describe("rendered HTML", () => {
     expect(html).not.toContain("Live Updates");
     expect(html).not.toContain("Streaming");
     expect(html).not.toContain("82%");
+    expect(html).not.toContain("Commands / Tools</b>");
+    expect(html).toContain("Generated with warnings");
+    expect(html).toContain("Failed, 1 failed test");
+    expect(html).not.toContain("Failed, 1 failed tests");
+    expect(html).toContain("Recorder Pipeline");
+    expect(html).toContain("Captured Run");
+    expect(html).toContain("Repository");
+    expect(html).toContain("Design tokens");
+    expect(html).toContain("Metric cards");
+    expect(html).toContain("Execution graph");
+    expect(html).toContain("Detail panel");
     expect(html).not.toMatch(/https?:\/\//);
     for (const match of html.matchAll(/<script>([\s\S]*?)<\/script>/g))
       expect(() => new vm.Script(match[1])).not.toThrow();
+  });
+
+  it("renders structured timeline, graph, detail tabs, and interactions", async () => {
+    const s = await parseClaudeSession(fx("claude/realistic-transcript.jsonl"));
+    const html = await fs.readFile(
+      await renderReplay(s, { cwd: process.cwd() }),
+      "utf8",
+    );
+    const dom = new JSDOM(html, { runScripts: "dangerously" });
+    const doc = dom.window.document;
+    const times = [...doc.querySelectorAll(".timeline-time")].map(
+      (n) => n.textContent ?? "",
+    );
+    expect(times.length).toBeGreaterThan(0);
+    expect(
+      times.every((t) => !t.includes("T") && !/\d{4}-\d{2}-\d{2}/.test(t)),
+    ).toBe(true);
+    expect(doc.querySelectorAll(".graph-node-title").length).toBeGreaterThan(0);
+    expect(
+      [...doc.querySelectorAll(".graph-node-title")].some(
+        (n) => n.textContent === "Commands",
+      ),
+    ).toBe(true);
+    expect(
+      [...doc.querySelectorAll(".graph-node-subtitle")].some(
+        (n) => n.textContent === "Tools and tests",
+      ),
+    ).toBe(true);
+    expect(
+      [...doc.querySelectorAll(".graph-node-title")].some(
+        (n) => n.textContent === "Commands / Tools",
+      ),
+    ).toBe(false);
+    expect(doc.body.textContent).toContain("Source");
+    expect(doc.body.textContent).toContain("Impact");
+    expect(doc.body.textContent).toContain("Replay Impact");
+    expect(doc.body.textContent).toContain("Captured Run Impact");
+
+    const failed = [
+      ...doc.querySelectorAll<HTMLElement>("[data-event-index]"),
+    ].find(
+      (n) =>
+        n.textContent?.includes("Test failed") ||
+        n.textContent?.includes("Command failed"),
+    );
+    failed?.click();
+    expect(doc.querySelector("#detailContent")?.textContent).toContain(
+      "Captured agent run",
+    );
+    expect(doc.querySelector("#detailContent")?.textContent).toContain(
+      "Captured run failed",
+    );
+    expect(doc.querySelector("#detailContent")?.textContent).toContain(
+      "None, replay generated successfully",
+    );
+    expect(doc.querySelector("#detailContent")?.textContent).toContain(
+      "Failed test command",
+    );
+
+    doc.querySelector<HTMLElement>("[data-graph-index]")?.click();
+    expect(doc.querySelector("#detailContent")?.textContent).toContain(
+      "Replay Impact",
+    );
+    [...doc.querySelectorAll<HTMLElement>(".tab")]
+      .find((n) => n.dataset.tab === "Raw JSON")
+      ?.click();
+    expect(doc.querySelector("#detailContent pre")?.textContent).toContain(
+      "id",
+    );
   });
 
   it("safeJsonForScript escapes closing script tags", () => {

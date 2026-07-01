@@ -24,7 +24,7 @@ describe("execution graph", () => {
       "Parse",
       "Normalize",
       "Agent Events",
-      "Commands / Tools",
+      "Commands",
       "File Changes",
       "Correlate",
       "Git State",
@@ -36,6 +36,9 @@ describe("execution graph", () => {
     );
     expect(graph.links.map((l) => `${l.from}:${l.to}`)).not.toContain(
       "correlate:replay-output",
+    );
+    expect(graph.nodes.find((n) => n.id === "commands")?.subtitle).toBe(
+      "Tools and tests",
     );
     expect(graph.nodes.find((n) => n.title === "Validate")).toBeUndefined();
     expect(graph.nodes.find((n) => n.title === "Review")).toBeUndefined();
@@ -81,5 +84,39 @@ describe("execution graph", () => {
     expect(
       graph.links.find((l) => l.id === "normalize-replay-output")?.status,
     ).toMatch(/completed|warning/);
+  });
+
+  it("dims captured-run nodes for git-only replay", async () => {
+    const graph = deriveExecutionGraph({
+      session: {
+        provider: "git",
+        events: [
+          {
+            id: "g1",
+            type: "git_commit",
+            title: "Commit",
+            summary: "Repository reconstruction",
+          },
+        ],
+        warnings: [],
+      },
+      git: {
+        head: "abcdef123456",
+        status: "clean",
+        diff: "diff --git a/a b/a",
+        diffStat: "1 file changed",
+      },
+      outputWritten: true,
+      htmlValid: true,
+    });
+    expect(graph.nodes.find((n) => n.id === "agent-events")?.laneTone).toBe(
+      "dimmed",
+    );
+    expect(graph.nodes.find((n) => n.id === "commands")?.laneTone).toBe(
+      "dimmed",
+    );
+    expect(graph.nodes.find((n) => n.id === "git-state")?.laneTone).toBe(
+      "emphasis",
+    );
   });
 });

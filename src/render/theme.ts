@@ -70,15 +70,16 @@ svg {
   max-width: 1760px;
   min-height: 100vh;
   margin: 0 auto;
-  padding: 16px 20px;
+  padding: 14px 18px;
   display: grid;
-  grid-template-rows: 56px 118px minmax(490px, 1fr) 190px;
+  grid-template-rows: 52px 104px minmax(492px, 1fr) 188px;
+  overflow: hidden;
   gap: 10px;
 }
 
 .main-grid {
   display: grid;
-  grid-template-columns: minmax(360px, 0.86fr) minmax(760px, 2.14fr);
+  grid-template-columns: minmax(380px, 0.72fr) minmax(820px, 1.78fr);
   gap: 10px;
   min-height: 0;
 }
@@ -219,7 +220,7 @@ h1 {
    ========================================================= */
 .metric-grid {
   display: grid;
-  grid-template-columns: minmax(190px, 1.28fr) minmax(150px, 0.95fr) minmax(155px, 1fr) minmax(220px, 1.42fr) minmax(160px, 1fr) minmax(190px, 1.2fr) minmax(145px, 0.9fr) minmax(200px, 1.2fr);
+  grid-template-columns: minmax(190px, 1.18fr) minmax(145px, 0.88fr) minmax(150px, 0.92fr) minmax(210px, 1.30fr) minmax(145px, 0.90fr) minmax(230px, 1.42fr) minmax(140px, 0.84fr) minmax(190px, 1.12fr);
   gap: 8px;
 }
 
@@ -271,16 +272,20 @@ h1 {
 
 .status-stack-row {
   display: grid;
-  grid-template-columns: 10px 1fr;
-  column-gap: 8px;
-  align-items: start;
+  grid-template-columns: 76px minmax(0, 1fr);
+  column-gap: 10px;
+  align-items: baseline;
 }
 
 .status-stack-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 10px;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--text-muted);
+  white-space: nowrap;
 }
 
 .status-stack-value {
@@ -294,7 +299,7 @@ h1 {
 .status-dot {
   width: 8px;
   height: 8px;
-  margin-top: 4px;
+  flex: 0 0 auto;
   border-radius: 999px;
   background: var(--blue);
   box-shadow: 0 0 10px rgba(59, 153, 255, 0.4);
@@ -342,24 +347,37 @@ h1 {
    ========================================================= */
 .timeline-list {
   position: relative;
-  height: 420px;
+  height: 410px;
   overflow: auto;
   padding-right: 4px;
 }
 
-.timeline-list::before {
+.timeline-list::before,
+.timeline-list::after {
   content: "";
-  position: absolute;
-  left: 104px;
-  top: 8px;
-  bottom: 8px;
-  width: 1px;
-  background: var(--border);
+  position: sticky;
+  left: 0;
+  right: 0;
+  z-index: 3;
+  display: block;
+  height: 18px;
+  pointer-events: none;
+}
+.timeline-list::before {
+  top: 0;
+  margin-bottom: -18px;
+  background: linear-gradient(180deg, rgba(5, 14, 24, 0.92), transparent);
+}
+.timeline-list::after {
+  bottom: 0;
+  margin-top: -18px;
+  background: linear-gradient(0deg, rgba(5, 14, 24, 0.88), transparent);
 }
 
 .timeline-row {
   display: grid;
-  grid-template-columns: 82px 44px 1fr;
+  grid-template-columns: 76px 28px minmax(0, 1fr);
+  column-gap: 8px;
   align-items: center;
   width: 100%;
   border: 0;
@@ -374,6 +392,10 @@ h1 {
 .timeline-row time {
   color: var(--text-muted);
   font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  align-self: center;
 }
 
 .rail {
@@ -413,9 +435,9 @@ h1 {
 }
 
 .timeline-row article {
-  height: 54px;
+  min-height: 50px;
   display: grid;
-  grid-template-columns: 34px 1fr auto;
+  grid-template-columns: 30px minmax(0, 1fr) auto;
   align-items: center;
   gap: 10px;
   padding: 8px 10px;
@@ -443,6 +465,9 @@ h1 {
 .timeline-row strong {
   display: block;
   font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .timeline-row p {
@@ -464,7 +489,7 @@ h1 {
    ========================================================= */
 .execution-graph-stage {
   position: relative;
-  height: 430px;
+  height: 350px;
   width: 1040px;
   margin: 0 auto;
 }
@@ -482,7 +507,7 @@ h1 {
   position: absolute;
   inset: 0;
   width: 1040px;
-  height: 390px;
+  height: 350px;
   overflow: visible;
 }
 
@@ -520,20 +545,41 @@ h1 {
 .graph-node {
   position: absolute;
   z-index: 1;
+  height: 64px;
   border-radius: 10px;
   background: linear-gradient(180deg, rgba(15, 34, 54, 0.94), rgba(7, 19, 32, 0.96));
   border: 1px solid var(--border-muted);
   color: var(--text);
   display: grid;
-  grid-template-columns: 30px 1fr;
-  grid-template-rows: 1fr 22px;
-  gap: 0 8px;
+  grid-template-rows: 22px 18px;
+  row-gap: 4px;
   text-align: left;
-  padding: 12px 10px;
+  padding: 12px;
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.05), 0 16px 34px rgba(0, 0, 0, 0.24);
   cursor: pointer;
 }
-
+.graph-node-main {
+  display: grid;
+  grid-template-columns: 20px 1fr auto;
+  align-items: center;
+  column-gap: 8px;
+  min-width: 0;
+}
+.graph-node-title {
+  font-size: 13px;
+  font-weight: 650;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.graph-node-subtitle {
+  grid-column: 2 / 4;
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .graph-node:hover,
 .graph-node.selected {
   border-color: var(--border-active);
@@ -557,9 +603,8 @@ h1 {
 }
 
 .node-badge {
-  position: absolute;
-  right: 8px;
-  top: 7px;
+  position: static;
+  justify-self: end;
   font-size: 9px;
   text-transform: uppercase;
   color: var(--text-muted);
@@ -670,7 +715,9 @@ h1 {
    Detail panel
    ========================================================= */
 .detail-panel {
-  height: 190px;
+  height: 188px;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .tabs {
@@ -703,13 +750,14 @@ h1 {
 
 .detail-content {
   padding-top: 10px;
-  height: 128px;
+  height: 126px;
+  min-height: 0;
   overflow: auto;
 }
 
 .detail-hero {
   display: grid;
-  grid-template-columns: 54px minmax(260px, 1fr) minmax(340px, 0.9fr);
+  grid-template-columns: 54px minmax(230px, 0.78fr) minmax(420px, 1.35fr);
   align-items: start;
   gap: 12px;
 }
@@ -795,6 +843,15 @@ h1 {
   background: rgba(124, 170, 220, 0.06);
 }
 
+
+.graph-panel {
+  border-color: rgba(132, 190, 255, 0.24);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,0.05), 0 20px 70px rgba(0,0,0,0.28), 0 0 34px rgba(59,153,255,0.08);
+}
+.timeline-panel { border-color: rgba(124, 170, 220, 0.14); box-shadow: inset 0 1px 0 rgba(255,255,255,0.035); }
+.metric-card { border-color: rgba(124, 170, 220, 0.13); box-shadow: inset 0 1px 0 rgba(255,255,255,0.035); }
+.detail-panel { border-color: rgba(124, 170, 220, 0.16); background: rgba(5, 14, 24, 0.88); }
+
 /* =========================================================
    Code blocks
    ========================================================= */
@@ -814,6 +871,35 @@ h1 {
   overflow: auto;
   color: #d7e4f5;
 }
+
+.investigation-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+.investigation-card {
+  border: 1px solid rgba(124, 170, 220, 0.12);
+  background: rgba(8, 19, 31, 0.46);
+  border-radius: 10px;
+  padding: 9px 10px;
+  min-width: 0;
+}
+.investigation-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: var(--text-dim);
+  margin-bottom: 5px;
+}
+.investigation-value {
+  font-size: 12px;
+  color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.graph-node.lane-dimmed { opacity: 0.52; }
+.graph-node.lane-emphasis { border-color: rgba(132, 190, 255, 0.28); }
 
 /* =========================================================
    Responsive
