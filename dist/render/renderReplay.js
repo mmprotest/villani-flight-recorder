@@ -1,7 +1,7 @@
 import fs from "node:fs/promises";
 import path from "node:path";
 import { getGitInfo } from "../git/gitInfo.js";
-import { htmlTemplate } from "./htmlTemplate.js";
+import { renderDashboard } from "./dashboard.js";
 import { replayRoot, safeSegment } from "../utils/paths.js";
 import { redactDeep } from "../redaction/redact.js";
 export async function renderReplay(session, opts = {}) {
@@ -11,6 +11,6 @@ export async function renderReplay(session, opts = {}) {
     const s = opts.redact === false ? session : redactDeep(session);
     const git = await getGitInfo(cwd);
     const file = path.join(out, "index.html");
-    await fs.writeFile(file, htmlTemplate(s, opts.redact === false ? git : redactDeep(git)), "utf8");
+    await fs.writeFile(file, renderDashboard(s, opts.redact === false ? git : redactDeep(git)), "utf8");
     return file;
 }
