@@ -2,31 +2,41 @@
 
 Villani Flight Recorder is a black box recorder for AI coding agents. It turns local Claude Code, Codex, Pi, and git activity into a static replay of what happened in your repo.
 
-It is local-first open-source CLI software: no SaaS, no hosted dashboard, no cloud upload, no accounts, and no telemetry.
+## What it does
 
-## Installation
+- Scans local provider session JSONL files.
+- Parses Claude Code, Codex, Pi, and git history into normalized events.
+- Generates a static, self-contained HTML investigation report in `.villani-flight-recorder/replays/`.
+- Shows prompts, assistant responses, tool calls, shell commands, file reads/edits, failed commands, warnings, unknown records, git state, and commit history where available.
 
-```bash
-npx villani-flight-recorder
-```
+## Why it exists
+
+AI coding agents can make many local decisions quickly. This tool provides a local-first replay so a maintainer can investigate what happened without uploading transcripts or running a hosted dashboard.
 
 ## Quick start
 
 ```bash
-villani-flight-recorder scan
-villani-flight-recorder replay --latest --open
+npm install
+npm run build
+villani-flight-recorder scan --provider claude
+villani-flight-recorder replay --provider claude --latest
+villani-flight-recorder replay --session path/to/session.jsonl --provider codex
 ```
 
-HTML is written to `.villani-flight-recorder/replays/<timestamp>-<provider>/index.html`.
+Example output path:
+
+```text
+.villani-flight-recorder/replays/<timestamp>-<provider>/index.html
+```
 
 ## Supported providers
 
-- Claude Code JSONL sessions from `~/.claude/projects/**/*.jsonl`
-- OpenAI Codex CLI JSONL sessions from `$CODEX_HOME/sessions/**/*.jsonl` and `~/.codex/sessions/**/*.jsonl`
-- Pi JSONL sessions from `~/.pi/agent/sessions/**/*.jsonl`
-- Git-only replay from repository history
+Provider parsers are defensive and best-effort. Unknown records are preserved in the replay instead of discarded.
 
-Provider schemas can change, so parsing is defensive: invalid JSONL lines become warnings, known message/tool/file/shell shapes become normalized events, and unrecognized records are preserved as unknown events with raw JSON available in the replay.
+- Claude Code: content-array text blocks, `tool_use`, `tool_result`, Bash, Read, Edit, MultiEdit, Write, NotebookEdit, Grep, Glob, and hook payload records.
+- Codex: session metadata, user/assistant messages, shell tool calls/results, apply patches, approvals/permission records, MCP-like tool calls, hook payload records, and unknown rollout events.
+- Pi: session start/end, messages, tool calls, tool execution start/update/end, bash failures, branch summaries, model changes, compaction/summary unknowns, and unknown events.
+- Git: commit sequence, authors, timestamps, changed files, patches, final diff/stat, and deterministic change flags.
 
 ## Commands
 
@@ -38,24 +48,50 @@ villani-flight-recorder replay --provider claude --latest
 villani-flight-recorder replay --provider codex --latest
 villani-flight-recorder replay --provider pi --latest
 villani-flight-recorder replay --session <path-to-jsonl>
-villani-flight-recorder git-replay --from main --to HEAD
+villani-flight-recorder git-replay --from <ref> --to <ref>
 villani-flight-recorder install-hooks
+villani-flight-recorder hook <provider>
 ```
+
+`scan --root <path>` requires an explicit `--provider` so one file is not parsed as multiple providers.
+
+Default scan roots:
+
+- Claude: `~/.claude/projects`
+- Codex: `$CODEX_HOME/sessions` or `~/.codex/sessions`
+- Pi: `~/.pi/agent/sessions`
 
 ## Privacy and redaction
 
-Redaction is enabled by default before HTML is written. It detects common API keys, bearer tokens, GitHub tokens, OpenAI/Anthropic-style keys, `.env` secret values, JWT-like tokens, AWS keys, private keys, and long high-entropy strings. Use `--no-redact` only when you are sure the replay stays private.
+Redaction is enabled by default and applies to messages, commands, stdout, stderr, diffs, raw JSON, warnings, and git data. Use `--no-redact` to disable it for local debugging only.
 
-## Git-only replay
+The redactor covers common API keys, provider tokens, bearer tokens, GitHub tokens, Slack tokens, npm tokens, AWS/Google-looking keys, JWT-like values, private keys, env-style assignments, credentialed connection strings, and long high-entropy strings.
 
-`git-replay` creates a static replay from commit history, changed files, patches, and final diffs. It honestly cannot know the agent's reasoning, failed attempts, approvals, commands, or tool calls unless those details were committed or captured elsewhere.
+## Hook installation behavior
 
-## Hook installation warning
+`install-hooks` currently writes documented snippets only. Manual installation is required. No Claude, Codex, or Pi config files are modified.
 
-`install-hooks` writes documented local snippets under `.villani-flight-recorder/` and backs up existing snippet files. Claude and Codex snippets call `villani-flight-recorder hook <provider>`. Pi native hook support is treated as uncertain; the tool prints/writes manual guidance instead of pretending integration exists.
+Hook ingestion remains available:
 
-## Current limitations
+```bash
+cat payload.json | villani-flight-recorder hook claude
+```
 
-- Provider parsers intentionally handle common JSONL shapes rather than every historical schema.
-- Static HTML is self-contained and local; there is no live dashboard or sharing service.
-- Session-to-repo matching depends on cwd/repo fields when providers expose them; otherwise the latest session is selected with a warning.
+It writes JSONL into `.villani-flight-recorder/hooks/`, includes a received timestamp and provider, preserves the raw payload, and fails non-zero on invalid JSON.
+
+## Git-only replay limitations
+
+Git-only replay cannot know agent reasoning, uncommitted failed attempts, tool calls, approvals, or commands unless those details are present in commits. It does not re-execute commands and does not mutate the repository.
+
+## Known limitations
+
+- Provider formats can change; unknown records are retained rather than discarded.
+- Hook installation is snippets-only until provider config formats can be safely modified.
+- Large stdout/stderr/diffs are truncated in the HTML view, while raw event context remains collapsed.
+- Replay selection prefers sessions whose cwd matches the current repo; if uncertain, it chooses the newest session and warns.
+
+## Troubleshooting
+
+- If `scan --root` fails, add `--provider claude`, `--provider codex`, or `--provider pi`.
+- If Codex sessions are not found, check `CODEX_HOME`; the scanner does not rely on the path containing the word `codex`.
+- If a record is unknown, open the collapsed raw JSON in the replay and file an issue with a sanitized example.

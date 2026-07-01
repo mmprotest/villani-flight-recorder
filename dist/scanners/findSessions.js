@@ -5,22 +5,79 @@ import { expandHome } from "../utils/paths.js";
 import { parseClaudeSession } from "../providers/claude.js";
 import { parseCodexSession } from "../providers/codex.js";
 import { parsePiSession } from "../providers/pi.js";
-const parsers = { claude: parseClaudeSession, codex: parseCodexSession, pi: parsePiSession };
-export async function findSessions(opts = {}) { const roots = opts.roots ?? [expandHome("~/.claude/projects"), path.join(process.env.CODEX_HOME ?? expandHome("~/.codex"), "sessions"), expandHome("~/.codex/sessions"), expandHome("~/.pi/agent/sessions")]; const providers = opts.provider && opts.provider !== "unknown" && opts.provider !== "git" ? [opts.provider] : ["claude", "codex", "pi"]; const out = []; for (const root of roots) {
-    for (const p of providers) {
-        if (!root.toLowerCase().includes(p) && opts.roots == null)
+const parsers = {
+    claude: parseClaudeSession,
+    codex: parseCodexSession,
+    pi: parsePiSession,
+};
+const real = (p) => p === "claude" || p === "codex" || p === "pi";
+export function defaultRoots(provider) {
+    const codexHome = process.env.CODEX_HOME
+        ? path.join(process.env.CODEX_HOME, "sessions")
+        : expandHome("~/.codex/sessions");
+    const roots = [
+        { provider: "claude", root: expandHome("~/.claude/projects") },
+        { provider: "codex", root: codexHome },
+        { provider: "codex", root: expandHome("~/.codex/sessions") },
+        { provider: "pi", root: expandHome("~/.pi/agent/sessions") },
+    ];
+    const seen = new Set();
+    return roots.filter((r) => (!provider || r.provider === provider) &&
+        !seen.has(path.resolve(r.root)) &&
+        seen.add(path.resolve(r.root)));
+}
+export async function findSessions(opts = {}) {
+    if (opts.roots?.length && !real(opts.provider ?? "unknown"))
+        throw new Error("--root requires --provider claude, --provider codex, or --provider pi");
+    const roots = opts.roots?.map((root) => ({
+        provider: opts.provider,
+        root: expandHome(root),
+    })) ?? defaultRoots(opts.provider);
+    const out = [];
+    for (const { provider, root } of roots) {
+        try {
+            await fs.access(root);
+        }
+        catch {
             continue;
-        const files = await fg("**/*.jsonl", { cwd: root, absolute: true, onlyFiles: true, suppressErrors: true });
+        }
+        const files = await fg("**/*.jsonl", {
+            cwd: root,
+            absolute: true,
+            onlyFiles: true,
+            suppressErrors: true,
+        });
         for (const f of files) {
             try {
                 const st = await fs.stat(f);
-                const parsed = await parsers[p](f);
-                out.push({ provider: p, path: f, mtimeMs: st.mtimeMs, size: st.size, cwd: parsed.cwd, sessionId: parsed.sessionId, eventCount: parsed.events.length, warnings: parsed.warnings });
+                const parsed = await parsers[provider](f);
+                out.push({
+                    provider,
+                    path: f,
+                    mtimeMs: st.mtimeMs,
+                    size: st.size,
+                    cwd: parsed.cwd,
+                    sessionId: parsed.sessionId,
+                    model: parsed.model,
+                    eventCount: parsed.events.length,
+                    warnings: parsed.warnings,
+                });
             }
             catch (e) {
-                out.push({ provider: p, path: f, mtimeMs: 0, size: 0, warnings: [String(e)] });
+                out.push({
+                    provider,
+                    path: f,
+                    mtimeMs: 0,
+                    size: 0,
+                    warnings: [e instanceof Error ? e.message : String(e)],
+                });
             }
         }
     }
-} return out.sort((a, b) => b.mtimeMs - a.mtimeMs); }
-export function chooseLatest(s, cwd = process.cwd()) { const match = s.find(x => x.cwd && path.resolve(cwd).startsWith(path.resolve(x.cwd))); return { candidate: match ?? s[0], uncertain: !match }; }
+    return out.sort((a, b) => b.mtimeMs - a.mtimeMs);
+}
+export function chooseLatest(s, cwd = process.cwd()) {
+    const root = path.resolve(cwd);
+    const match = s.find((x) => x.cwd && root.startsWith(path.resolve(x.cwd)));
+    return { candidate: match ?? s[0], uncertain: !match };
+}
