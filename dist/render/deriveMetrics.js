@@ -5,7 +5,7 @@ const task = (s) => s.events.find((e) => e.type === "user_message")?.summary ??
 export const runnerLabel = (p) => ({ claude: "Claude Code", codex: "Codex", pi: "Pi", git: "Git Replay" })[p] ??
     p ??
     "Unknown";
-export function deriveMetrics(session, hasFail, hasWarning) {
+export function deriveMetrics(session, replayStatus, capturedRunStatus) {
     const dur = session.startedAt && session.endedAt
         ? fmtDuration(new Date(session.endedAt).getTime() -
             new Date(session.startedAt).getTime())
@@ -52,10 +52,20 @@ export function deriveMetrics(session, hasFail, hasWarning) {
         {
             id: "status",
             label: "STATUS",
-            value: hasFail ? "FAILED" : hasWarning ? "WARNING" : "COMPLETE",
-            subvalue: "Static replay",
-            icon: hasFail ? "x" : hasWarning ? "warn" : "check",
-            tone: hasFail ? "error" : hasWarning ? "warning" : "success",
+            value: replayStatus.label,
+            subvalue: `Captured: ${capturedRunStatus.label} — ${capturedRunStatus.reason}`,
+            icon: replayStatus.tone === "error"
+                ? "x"
+                : replayStatus.tone === "warning"
+                    ? "warn"
+                    : "check",
+            tone: replayStatus.tone === "error"
+                ? "error"
+                : replayStatus.tone === "warning"
+                    ? "warning"
+                    : replayStatus.tone === "success"
+                        ? "success"
+                        : "info",
         },
         {
             id: "duration",

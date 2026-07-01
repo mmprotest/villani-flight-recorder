@@ -1,6 +1,8 @@
 import { deriveExecutionGraph } from "./deriveGraph.js";
 import { deriveMetrics } from "./deriveMetrics.js";
 import { deriveTimeline } from "./deriveTimeline.js";
+import { deriveReplayStatus } from "./deriveReplayStatus.js";
+import { deriveCapturedRunStatus } from "./deriveCapturedRunStatus.js";
 import { changedFilesFromGit, diffFromGit } from "./deriveDetails.js";
 export const fmtTime = (v) => {
     if (!v)
@@ -19,7 +21,6 @@ export const fmtDuration = (ms) => ms === undefined
     : ms < 1000
         ? `${ms}ms`
         : `${(ms / 1000).toFixed(ms < 10000 ? 2 : 1)}s`;
-const failed = (events) => events.some((e) => e.type === "error" || (e.exitCode ?? 0) !== 0);
 export function deriveReplayViewModel(session, git) {
     const events = session.events.length
         ? session.events
@@ -37,10 +38,15 @@ export function deriveReplayViewModel(session, git) {
         ...session.warnings,
         ...events.flatMap((e) => e.warnings ?? []),
     ];
-    const hasFail = failed(events);
-    const hasWarning = warnings.length > 2 ||
-        events.filter((e) => e.type === "unknown").length >
-            Math.max(0, events.length - events.filter((e) => e.type === "unknown").length);
+    const unknownEventsCount = events.filter((e) => e.type === "unknown").length;
+    const replayStatus = deriveReplayStatus({
+        events,
+        warnings,
+        unknownEventsCount,
+        outputWritten: true,
+        htmlValidated: true,
+    });
+    const capturedRunStatus = deriveCapturedRunStatus(events);
     const timeline = deriveTimeline(events);
     return {
         brand: { title: "Villani Flight Recorder", mode: "REPLAY" },
@@ -50,11 +56,15 @@ export function deriveReplayViewModel(session, git) {
             showProgress: true,
             primaryActionLabel: "Open in Console",
         },
-        metrics: deriveMetrics(normalizedSession, hasFail, hasWarning),
+        replayStatus,
+        capturedRunStatus,
+        metrics: deriveMetrics(normalizedSession, replayStatus, capturedRunStatus),
         timeline,
         graph: deriveExecutionGraph({
             session: normalizedSession,
             git,
+            replayStatus,
+            capturedRunStatus,
             htmlValid: true,
             outputWritten: true,
         }),

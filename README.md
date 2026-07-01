@@ -95,3 +95,7 @@ Git-only replay cannot know agent reasoning, uncommitted failed attempts, tool c
 - If `scan --root` fails, add `--provider claude`, `--provider codex`, or `--provider pi`.
 - If Codex sessions are not found, check `CODEX_HOME`; the scanner does not rely on the path containing the word `codex`.
 - If a record is unknown, open the collapsed raw JSON in the replay and file an issue with a sanitized example.
+
+### Status model
+
+Villani Flight Recorder separates replay processing status from captured run status. A replay can be generated successfully even when the captured AI agent run failed tests or commands; the dashboard shows recorder output status and captured run outcome as separate concepts.

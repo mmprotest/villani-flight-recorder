@@ -165,12 +165,12 @@ describe("cli support", () => {
     expect(html).toContain("Parse");
     expect(html).toContain("Normalize");
     expect(html).toContain("Correlate");
-    expect(html).toContain("Session Events");
+    expect(html).toContain("Agent Events");
     expect(html).toContain("Git State");
     expect(html).toContain("Diff Capture");
-    expect(html).toContain("Validate");
-    expect(html).toContain("Review");
-    expect(html).toContain("Finalize");
+    expect(html).toContain("Commands / Tools");
+    expect(html).toContain("File Changes");
+    expect(html).toContain("Replay Output");
     expect(html).toContain("graph-links");
     expect(html).toContain('marker id="arrow-completed"');
     expect(html).toContain("Ran npm test");
@@ -179,7 +179,8 @@ describe("cli support", () => {
     expect(html).not.toContain("Live Updates");
     expect(html).not.toContain("Streaming");
     expect(html).not.toContain("82%");
-    expect(html).not.toMatch(/Validate[\s\S]{0,400}running/i);
+    expect(html).not.toMatch(/Replay Output[\s\S]{0,400}running/i);
+    expect(html).not.toContain("Validate failed");
     expect(html).not.toMatch(/https?:\/\//);
     const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(
       (match) => match[1],
@@ -246,10 +247,10 @@ describe("dashboard graph severity and polish", () => {
       await import("../src/render/deriveGraph.js");
     const s = await parseClaudeSession(fx("claude/realistic-transcript.jsonl"));
     const graph = deriveExecutionGraph({ session: s, git: null });
-    expect(graph.nodes.find((n) => n.id === "session-events")?.severity).toBe(
+    expect(graph.nodes.find((n) => n.id === "agent-events")?.severity).toBe(
       "minor-warning",
     );
-    expect(graph.nodes.find((n) => n.id === "session-events")?.status).toBe(
+    expect(graph.nodes.find((n) => n.id === "agent-events")?.status).toBe(
       "completed",
     );
     expect(graph.nodes.find((n) => n.id === "git-state")?.severity).toBe(
@@ -265,7 +266,10 @@ describe("dashboard graph severity and polish", () => {
       await import("../src/render/deriveGraph.js");
     const s = await parsePiSession(fx("pi/realistic-session.jsonl"));
     const graph = deriveExecutionGraph({ session: s, git: null });
-    expect(graph.nodes.find((n) => n.id === "validate")?.status).toBe("failed");
+    expect(graph.nodes.find((n) => n.id === "commands")?.status).toBe("failed");
+    expect(graph.nodes.find((n) => n.id === "replay-output")?.status).not.toBe(
+      "failed",
+    );
     expect(graph.nodes.some((n) => n.status === "running")).toBe(false);
   });
 
@@ -280,7 +284,7 @@ describe("dashboard graph severity and polish", () => {
     expect(html).toContain('marker id="arrow-completed"');
     expect(html).toContain('markerWidth="4"');
     expect(html).toContain("graph-link completed");
-    expect(html).toContain("graph-link pending");
+    expect(html).toMatch(/graph-link (pending|completed)/);
     expect(html).toContain("Replay Event Timeline");
     expect(html).toContain("Execution Graph");
     expect(html).toContain("Event Detail");
@@ -307,7 +311,7 @@ describe("dashboard graph severity and polish", () => {
     dom.window.document.querySelectorAll<HTMLElement>(".graph-node")[4].click();
     expect(
       dom.window.document.querySelector("#detailContent")?.textContent,
-    ).toContain("Session Events");
+    ).toContain("Agent Events");
     dom.window.document
       .querySelector<HTMLElement>('[data-tab="Raw JSON"]')
       ?.click();
@@ -326,6 +330,79 @@ describe("dashboard graph severity and polish", () => {
     expect(
       dom.window.document.querySelector("#detailContent")?.textContent,
     ).toMatch(/No redactions applied|redact/i);
+  });
+
+  it("separates replay status from captured run failures", async () => {
+    const { deriveReplayStatus } =
+      await import("../src/render/deriveReplayStatus.js");
+    const { deriveCapturedRunStatus } =
+      await import("../src/render/deriveCapturedRunStatus.js");
+    const { deriveExecutionGraph } =
+      await import("../src/render/deriveGraph.js");
+    const s = await parseClaudeSession(fx("claude/realistic-transcript.jsonl"));
+    const captured = deriveCapturedRunStatus(s.events);
+    const replay = deriveReplayStatus({
+      events: s.events,
+      warnings: [],
+      unknownEventsCount: 0,
+      outputWritten: true,
+      htmlValidated: true,
+    });
+    expect(captured.status).toBe("failed");
+    expect(replay.status).not.toBe("render_failed");
+    expect(replay.status).not.toBe("write_failed");
+    const graph = deriveExecutionGraph({
+      session: s,
+      git: null,
+      replayStatus: replay,
+      capturedRunStatus: captured,
+    });
+    expect(graph.nodes.find((n) => n.id === "commands")?.status).toBe("failed");
+    expect(graph.nodes.find((n) => n.id === "replay-output")?.status).not.toBe(
+      "failed",
+    );
+    expect(graph.nodes.find((n) => n.title === "Validate")).toBeUndefined();
+  });
+
+  it("git-only replay marks captured run not applicable and commands not failed", async () => {
+    const { deriveCapturedRunStatus } =
+      await import("../src/render/deriveCapturedRunStatus.js");
+    const { deriveExecutionGraph } =
+      await import("../src/render/deriveGraph.js");
+    const d = await fs.mkdtemp(path.join(os.tmpdir(), "vfr-status-"));
+    await exec("git", ["init"], { cwd: d });
+    await exec("git", ["config", "user.email", "a@b.c"], { cwd: d });
+    await exec("git", ["config", "user.name", "A"], { cwd: d });
+    await fs.writeFile(path.join(d, "a.txt"), "a");
+    await exec("git", ["add", "."], { cwd: d });
+    await exec("git", ["commit", "-m", "first"], { cwd: d });
+    await fs.writeFile(path.join(d, "a.txt"), "b");
+    await exec("git", ["commit", "-am", "second"], { cwd: d });
+    const s = await buildGitReplay("HEAD~1", "HEAD", d);
+    const captured = deriveCapturedRunStatus(s.events);
+    expect(captured.status).toBe("not_applicable");
+    const graph = deriveExecutionGraph({
+      session: s,
+      git: null,
+      capturedRunStatus: captured,
+    });
+    expect(graph.nodes.find((n) => n.id === "commands")?.status).not.toBe(
+      "failed",
+    );
+  });
+
+  it("parse warnings can produce replay warnings independently of captured failure", async () => {
+    const { deriveReplayStatus } =
+      await import("../src/render/deriveReplayStatus.js");
+    const s = await parseCodexSession(fx("codex/realistic-rollout.jsonl"));
+    const replay = deriveReplayStatus({
+      events: s.events,
+      warnings: ["parser note"],
+      unknownEventsCount: 0,
+      outputWritten: true,
+      htmlValidated: true,
+    });
+    expect(replay.status).toBe("generated_with_warnings");
   });
 
   it("safeJsonForScript escapes closing script tags", async () => {
