@@ -239,3 +239,97 @@ describe("cli support", () => {
     ).rejects.toBeTruthy();
   });
 });
+
+describe("dashboard graph severity and polish", () => {
+  it("deriveExecutionGraph treats a single unknown event as minor-warning and no git as unavailable", async () => {
+    const { deriveExecutionGraph } =
+      await import("../src/render/deriveGraph.js");
+    const s = await parseClaudeSession(fx("claude/realistic-transcript.jsonl"));
+    const graph = deriveExecutionGraph({ session: s, git: null });
+    expect(graph.nodes.find((n) => n.id === "session-events")?.severity).toBe(
+      "minor-warning",
+    );
+    expect(graph.nodes.find((n) => n.id === "session-events")?.status).toBe(
+      "completed",
+    );
+    expect(graph.nodes.find((n) => n.id === "git-state")?.severity).toBe(
+      "unavailable",
+    );
+    expect(graph.nodes.find((n) => n.id === "correlate")?.status).not.toBe(
+      "warning",
+    );
+  });
+
+  it("deriveExecutionGraph marks failed command sessions failed and static replay has no running nodes", async () => {
+    const { deriveExecutionGraph } =
+      await import("../src/render/deriveGraph.js");
+    const s = await parsePiSession(fx("pi/realistic-session.jsonl"));
+    const graph = deriveExecutionGraph({ session: s, git: null });
+    expect(graph.nodes.find((n) => n.id === "validate")?.status).toBe("failed");
+    expect(graph.nodes.some((n) => n.status === "running")).toBe(false);
+  });
+
+  it("rendered html includes refined graph, metric empty states, tabs, and interaction details", async () => {
+    const s = await parseClaudeSession(fx("claude/realistic-transcript.jsonl"));
+    const htmlPath = await renderReplay(s, { cwd: process.cwd() });
+    const html = await fs.readFile(htmlPath, "utf8");
+    expect(html).toContain("Not captured");
+    expect(html).toContain("No token telemetry");
+    expect(html).toContain("No cost telemetry");
+    expect(html).not.toContain('<svg class="spark"');
+    expect(html).toContain('marker id="arrow-completed"');
+    expect(html).toContain('markerWidth="4"');
+    expect(html).toContain("graph-link completed");
+    expect(html).toContain("graph-link pending");
+    expect(html).toContain("Replay Event Timeline");
+    expect(html).toContain("Execution Graph");
+    expect(html).toContain("Event Detail");
+    expect(html).not.toContain("Live Updates");
+    expect(html).not.toContain("Streaming");
+    expect(html).not.toContain("82%");
+    expect(html).not.toMatch(/https?:\/\//);
+    expect(html).toContain("severity-failed");
+    const scripts = [...html.matchAll(/<script>([\s\S]*?)<\/script>/g)].map(
+      (match) => match[1],
+    );
+    for (const script of scripts)
+      expect(() => new vm.Script(script)).not.toThrow();
+    const dom = new JSDOM(html, { runScripts: "dangerously" });
+    dom.window.document
+      .querySelectorAll<HTMLElement>(".timeline-row")[1]
+      .click();
+    expect(
+      dom.window.document.querySelector("#detailContent")?.textContent,
+    ).toContain("Event ID");
+    expect(
+      dom.window.document.querySelector("#detailContent")?.textContent,
+    ).not.toContain("Unavailable");
+    dom.window.document.querySelectorAll<HTMLElement>(".graph-node")[4].click();
+    expect(
+      dom.window.document.querySelector("#detailContent")?.textContent,
+    ).toContain("Session Events");
+    dom.window.document
+      .querySelector<HTMLElement>('[data-tab="Raw JSON"]')
+      ?.click();
+    expect(
+      dom.window.document.querySelector("#detailContent pre")?.textContent,
+    ).toContain("title");
+    dom.window.document
+      .querySelector<HTMLElement>('[data-tab="Warnings"]')
+      ?.click();
+    expect(
+      dom.window.document.querySelector("#detailContent")?.textContent,
+    ).toContain("Parse warnings");
+    dom.window.document
+      .querySelector<HTMLElement>('[data-tab="Redaction"]')
+      ?.click();
+    expect(
+      dom.window.document.querySelector("#detailContent")?.textContent,
+    ).toMatch(/No redactions applied|redact/i);
+  });
+
+  it("safeJsonForScript escapes closing script tags", async () => {
+    const { safeJsonForScript } = await import("../src/render/safeHtml.js");
+    expect(safeJsonForScript({ x: "</script>" })).toContain("\\u003c/script");
+  });
+});
