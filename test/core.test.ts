@@ -4,6 +4,7 @@ import path from "node:path";
 import os from "node:os";
 import { execFile } from "node:child_process";
 import vm from "node:vm";
+import { JSDOM } from "jsdom";
 import { promisify } from "node:util";
 import { readJsonl } from "../src/utils/jsonl.js";
 import { parseClaudeSession } from "../src/providers/claude.js";
@@ -170,9 +171,13 @@ describe("cli support", () => {
     expect(html).toContain("Validate");
     expect(html).toContain("Review");
     expect(html).toContain("Finalize");
+    expect(html).toContain("graph-links");
+    expect(html).toContain('marker id="arrow-completed"');
     expect(html).toContain("Ran npm test");
     expect(html).toContain("detailContent");
-    expect(html).not.toContain("Live Updates <b>Streaming</b>");
+    expect(html).toContain("Initial Event Detail");
+    expect(html).not.toContain("Live Updates");
+    expect(html).not.toContain("Streaming");
     expect(html).not.toContain("82%");
     expect(html).not.toMatch(/Validate[\s\S]{0,400}running/i);
     expect(html).not.toMatch(/https?:\/\//);
@@ -183,6 +188,36 @@ describe("cli support", () => {
     for (const script of scripts) {
       expect(() => new vm.Script(script)).not.toThrow();
     }
+    const dom = new JSDOM(html, { runScripts: "dangerously" });
+    expect(
+      dom.window.document.querySelector(".timeline-row.selected"),
+    ).toBeTruthy();
+    const secondRow =
+      dom.window.document.querySelectorAll<HTMLElement>(".timeline-row")[1];
+    secondRow.click();
+    expect(secondRow.classList.contains("selected")).toBe(true);
+    expect(
+      dom.window.document.querySelector("#detailContent")?.textContent,
+    ).toContain("Provider/Runner");
+    const graphNode =
+      dom.window.document.querySelectorAll<HTMLElement>(".graph-node")[2];
+    graphNode.click();
+    expect(graphNode.classList.contains("selected")).toBe(true);
+    expect(
+      dom.window.document.querySelector("#detailContent")?.textContent,
+    ).toContain("Normalize");
+    dom.window.document
+      .querySelector<HTMLElement>('[data-tab="Raw JSON"]')
+      ?.click();
+    expect(
+      dom.window.document.querySelector("#detailContent pre")?.textContent,
+    ).toContain("title");
+    const warningNode = [
+      ...dom.window.document.querySelectorAll(".graph-node.warning"),
+    ]
+      .map((n) => n.textContent)
+      .join(" ");
+    expect(warningNode).not.toMatch(/RUNNING/i);
   });
   it("git replay works in a temporary git repo and CLI invalid input exits nonzero", async () => {
     const d = await fs.mkdtemp(path.join(os.tmpdir(), "vfr-"));
