@@ -1,4 +1,97 @@
-import fs from "node:fs/promises"; import path from "node:path"; import fg from "fast-glob"; import { SessionCandidate, Provider } from "../providers/types.js"; import { expandHome } from "../utils/paths.js"; import { parseClaudeSession } from "../providers/claude.js"; import { parseCodexSession } from "../providers/codex.js"; import { parsePiSession } from "../providers/pi.js";
-const parsers={claude:parseClaudeSession,codex:parseCodexSession,pi:parsePiSession} as const;
-export async function findSessions(opts:{provider?:Provider; roots?:string[]; cwd?:string}={}):Promise<SessionCandidate[]>{ const roots=opts.roots??[expandHome("~/.claude/projects"), path.join(process.env.CODEX_HOME??expandHome("~/.codex"),"sessions"), expandHome("~/.codex/sessions"), expandHome("~/.pi/agent/sessions")]; const providers:Provider[]=opts.provider&&opts.provider!=="unknown"&&opts.provider!=="git"?[opts.provider]:["claude","codex","pi"]; const out:SessionCandidate[]=[]; for(const root of roots){ for(const p of providers){ if(!root.toLowerCase().includes(p) && opts.roots==null) continue; const files=await fg("**/*.jsonl",{cwd:root,absolute:true,onlyFiles:true,suppressErrors:true}); for(const f of files){ try{ const st=await fs.stat(f); const parsed=await parsers[p as keyof typeof parsers](f); out.push({provider:p,path:f,mtimeMs:st.mtimeMs,size:st.size,cwd:parsed.cwd,sessionId:parsed.sessionId,eventCount:parsed.events.length,warnings:parsed.warnings}); }catch(e){ out.push({provider:p,path:f,mtimeMs:0,size:0,warnings:[String(e)]}); } } } } return out.sort((a,b)=>b.mtimeMs-a.mtimeMs); }
-export function chooseLatest(s:SessionCandidate[],cwd=process.cwd()){ const match=s.find(x=>x.cwd&&path.resolve(cwd).startsWith(path.resolve(x.cwd))); return {candidate:match??s[0], uncertain:!match}; }
+import fs from "node:fs/promises";
+import path from "node:path";
+import fg from "fast-glob";
+import { SessionCandidate, Provider } from "../providers/types.js";
+import { expandHome } from "../utils/paths.js";
+import { parseClaudeSession } from "../providers/claude.js";
+import { parseCodexSession } from "../providers/codex.js";
+import { parsePiSession } from "../providers/pi.js";
+
+const parsers = {
+  claude: parseClaudeSession,
+  codex: parseCodexSession,
+  pi: parsePiSession,
+} as const;
+const real = (p: Provider): p is keyof typeof parsers =>
+  p === "claude" || p === "codex" || p === "pi";
+
+export function defaultRoots(
+  provider?: Provider,
+): { provider: keyof typeof parsers; root: string }[] {
+  const codexHome = process.env.CODEX_HOME
+    ? path.join(process.env.CODEX_HOME, "sessions")
+    : expandHome("~/.codex/sessions");
+  const roots = [
+    { provider: "claude" as const, root: expandHome("~/.claude/projects") },
+    { provider: "codex" as const, root: codexHome },
+    { provider: "codex" as const, root: expandHome("~/.codex/sessions") },
+    { provider: "pi" as const, root: expandHome("~/.pi/agent/sessions") },
+  ];
+  const seen = new Set<string>();
+  return roots.filter(
+    (r) =>
+      (!provider || r.provider === provider) &&
+      !seen.has(path.resolve(r.root)) &&
+      seen.add(path.resolve(r.root)),
+  );
+}
+
+export async function findSessions(
+  opts: { provider?: Provider; roots?: string[]; cwd?: string } = {},
+): Promise<SessionCandidate[]> {
+  if (opts.roots?.length && !real(opts.provider ?? "unknown"))
+    throw new Error(
+      "--root requires --provider claude, --provider codex, or --provider pi",
+    );
+  const roots =
+    opts.roots?.map((root) => ({
+      provider: opts.provider as keyof typeof parsers,
+      root: expandHome(root),
+    })) ?? defaultRoots(opts.provider);
+  const out: SessionCandidate[] = [];
+  for (const { provider, root } of roots) {
+    try {
+      await fs.access(root);
+    } catch {
+      continue;
+    }
+    const files = await fg("**/*.jsonl", {
+      cwd: root,
+      absolute: true,
+      onlyFiles: true,
+      suppressErrors: true,
+    });
+    for (const f of files) {
+      try {
+        const st = await fs.stat(f);
+        const parsed = await parsers[provider](f);
+        out.push({
+          provider,
+          path: f,
+          mtimeMs: st.mtimeMs,
+          size: st.size,
+          cwd: parsed.cwd,
+          sessionId: parsed.sessionId,
+          model: parsed.model,
+          eventCount: parsed.events.length,
+          warnings: parsed.warnings,
+        });
+      } catch (e) {
+        out.push({
+          provider,
+          path: f,
+          mtimeMs: 0,
+          size: 0,
+          warnings: [e instanceof Error ? e.message : String(e)],
+        });
+      }
+    }
+  }
+  return out.sort((a, b) => b.mtimeMs - a.mtimeMs);
+}
+
+export function chooseLatest(s: SessionCandidate[], cwd = process.cwd()) {
+  const root = path.resolve(cwd);
+  const match = s.find((x) => x.cwd && root.startsWith(path.resolve(x.cwd)));
+  return { candidate: match ?? s[0], uncertain: !match };
+}
