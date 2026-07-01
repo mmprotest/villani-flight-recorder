@@ -9,6 +9,10 @@ const cmdTypes = new Set([
   "test_run",
 ]);
 const editTypes = new Set(["file_edit", "file_write", "file_delete"]);
+const toolUseId = (raw: unknown) =>
+  raw && typeof raw === "object"
+    ? String((raw as { tool_use_id?: unknown }).tool_use_id ?? "") || undefined
+    : undefined;
 const hasErrorFlag = (raw: unknown) =>
   Boolean(
     raw &&
@@ -34,12 +38,28 @@ export function deriveCapturedRunStatus(
   const hasAgent = events.some(
     (e) => !["git_commit", "git_status", "diff"].includes(e.type),
   );
-  const totalCommands = events.filter(commandLike).length;
-  const totalTests = events.filter(testLike).length;
-  const failedCommands = events.filter(
-    (e) => commandLike(e) && failedLike(e),
-  ).length;
-  const failedTests = events.filter((e) => testLike(e) && failedLike(e)).length;
+  const commandKeys = new Set(
+    events
+      .filter(commandLike)
+      .map((e) => toolUseId(e.raw) ?? e.command ?? e.id),
+  );
+  const testKeys = new Set(
+    events.filter(testLike).map((e) => toolUseId(e.raw) ?? e.command ?? e.id),
+  );
+  const failedCommandKeys = new Set(
+    events
+      .filter((e) => commandLike(e) && failedLike(e))
+      .map((e) => toolUseId(e.raw) ?? e.command ?? e.id),
+  );
+  const failedTestKeys = new Set(
+    events
+      .filter((e) => testLike(e) && failedLike(e))
+      .map((e) => toolUseId(e.raw) ?? e.command ?? e.id),
+  );
+  const totalCommands = commandKeys.size;
+  const totalTests = testKeys.size;
+  const failedCommands = failedCommandKeys.size;
+  const failedTests = failedTestKeys.size;
   const fileEdits = events.filter(
     (e) =>
       editTypes.has(e.type) ||

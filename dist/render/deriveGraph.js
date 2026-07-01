@@ -1,16 +1,76 @@
 import { GRAPH_COORDS } from "./graphGeometry.js";
 import { deriveCapturedRunStatus } from "./deriveCapturedRunStatus.js";
 import { deriveReplayStatus } from "./deriveReplayStatus.js";
+export const GRAPH_LINKS = [
+    {
+        id: "discover-parse",
+        from: "discover",
+        to: "parse",
+        kind: "recorder_pipeline",
+    },
+    {
+        id: "parse-normalize",
+        from: "parse",
+        to: "normalize",
+        kind: "recorder_pipeline",
+    },
+    {
+        id: "normalize-replay-output",
+        from: "normalize",
+        to: "replay-output",
+        kind: "replay_output",
+    },
+    {
+        id: "normalize-agent-events",
+        from: "normalize",
+        to: "agent-events",
+        kind: "recorder_to_captured",
+    },
+    {
+        id: "agent-events-commands",
+        from: "agent-events",
+        to: "commands",
+        kind: "captured_execution",
+    },
+    {
+        id: "commands-file-changes",
+        from: "commands",
+        to: "file-changes",
+        kind: "captured_artifact",
+    },
+    {
+        id: "commands-correlate",
+        from: "commands",
+        to: "correlate",
+        kind: "repo_correlation",
+    },
+    {
+        id: "correlate-git-state",
+        from: "correlate",
+        to: "git-state",
+        kind: "repo_correlation",
+    },
+    {
+        id: "git-state-diff-capture",
+        from: "git-state",
+        to: "diff-capture",
+        kind: "repo_artifact",
+    },
+    {
+        id: "diff-capture-file-changes",
+        from: "diff-capture",
+        to: "file-changes",
+        kind: "repo_artifact",
+    },
+];
 const gitAvailable = (git) => Boolean(git?.head || git?.status || git?.diff || git?.diffStat);
 const statusFromSeverity = (s) => s === "failed"
     ? "failed"
     : s === "warning"
         ? "warning"
-        : s === "skipped"
+        : s === "skipped" || s === "unavailable"
             ? "skipped"
-            : s === "unavailable"
-                ? "skipped"
-                : "completed";
+            : "completed";
 const node = (id, title, severity, subtitle, icon, badgeLabel) => ({
     id,
     title,
@@ -31,13 +91,46 @@ const node = (id, title, severity, subtitle, icon, badgeLabel) => ({
     ...GRAPH_COORDS[id],
     detail: { title, summary: subtitle },
 });
-const linkStatus = (a, b) => a.status === "failed" || b.status === "failed"
-    ? "failed"
-    : a.severity === "warning" || b.severity === "warning"
-        ? "warning"
-        : a.status === "skipped" || b.status === "skipped"
-            ? "pending"
-            : "completed";
+export function deriveGraphLinkStatus(input) {
+    const { link, nodesById, replayStatus, capturedRunStatus, hasGitInfo, hasDiffInfo, } = input;
+    const to = nodesById.get(link.to);
+    switch (link.kind) {
+        case "recorder_pipeline":
+            if (replayStatus.status === "parse_failed")
+                return "failed";
+            return to?.severity === "warning" || to?.severity === "minor-warning"
+                ? "warning"
+                : "completed";
+        case "replay_output":
+            if (["render_failed", "write_failed"].includes(replayStatus.status))
+                return "failed";
+            if (replayStatus.status === "generated_with_warnings" ||
+                replayStatus.status === "partial")
+                return "warning";
+            return "completed";
+        case "recorder_to_captured":
+            if (capturedRunStatus.status === "not_applicable" ||
+                to?.severity === "unavailable")
+                return "pending";
+            return to?.severity === "warning" || to?.severity === "minor-warning"
+                ? "warning"
+                : "completed";
+        case "captured_execution":
+            if (capturedRunStatus.failedCommands || capturedRunStatus.failedTests)
+                return "failed";
+            return capturedRunStatus.totalCommands || capturedRunStatus.totalTests
+                ? "completed"
+                : "pending";
+        case "captured_artifact":
+            return capturedRunStatus.fileEdits ? "completed" : "pending";
+        case "repo_correlation":
+            return hasGitInfo ? "completed" : "pending";
+        case "repo_artifact":
+            if (!hasGitInfo)
+                return "pending";
+            return hasDiffInfo ? "completed" : "warning";
+    }
+}
 export function deriveExecutionGraph(input) {
     const { session, git } = input;
     const events = session.events;
@@ -102,7 +195,6 @@ export function deriveExecutionGraph(input) {
             ? `Parsed with ${warnings.length} warnings`
             : `${events.length} events`, "parse", parseSeverity === "minor-warning" ? "partial" : undefined),
         node("normalize", "Normalize", events.length ? "none" : "failed", events.length ? "normalized events" : "empty timeline", "normalize"),
-        node("correlate", "Correlate", hasGit ? "none" : "unavailable", hasGit ? "repo metadata" : "not a git repo", "correlate", hasGit ? undefined : "not captured"),
         node("agent-events", "Agent Events", agentSeverity, captured.status === "not_applicable"
             ? "Git-only replay"
             : unknown
@@ -132,12 +224,9 @@ export function deriveExecutionGraph(input) {
             : captured.fileEdits
                 ? `${captured.fileEdits} edits captured`
                 : "none captured", "edit", fileSeverity === "unavailable" ? "N/A" : undefined),
+        node("correlate", "Correlate", hasGit ? "none" : "unavailable", hasGit ? "repo metadata" : "not a git repo", "correlate", hasGit ? undefined : "not captured"),
         node("git-state", "Git State", hasGit ? "none" : "unavailable", git?.head ? git.head.slice(0, 12) : "not a git repo", "branch", hasGit ? undefined : "not captured"),
-        node("diff-capture", "Diff Capture", diffOk ? "none" : hasGit ? "minor-warning" : "unavailable", diffOk
-            ? "diff available"
-            : hasGit
-                ? "no git diff captured"
-                : "no git diff captured", "edit", diffOk ? undefined : "not captured"),
+        node("diff-capture", "Diff Capture", diffOk ? "none" : hasGit ? "minor-warning" : "unavailable", diffOk ? "diff available" : "no git diff captured", "edit", diffOk ? undefined : "not captured"),
         node("replay-output", "Replay Output", outputSeverity, replayStatus.status === "generated"
             ? "HTML written"
             : replayStatus.reason, "flag", outputSeverity === "failed"
@@ -146,26 +235,22 @@ export function deriveExecutionGraph(input) {
                 ? "WARNING"
                 : "COMPLETE"),
     ];
-    const pairs = [
-        "discover:parse",
-        "parse:normalize",
-        "normalize:correlate",
-        "correlate:replay-output",
-        "normalize:agent-events",
-        "agent-events:commands",
-        "commands:file-changes",
-        "commands:git-state",
-        "git-state:diff-capture",
-    ];
-    const links = pairs.map((s, i) => {
-        const [from, to] = s.split(":");
-        const a = nodes.find((n) => n.id === from);
-        const b = nodes.find((n) => n.id === to);
-        return { id: `l${i}`, from, to, status: linkStatus(a, b) };
-    });
+    const nodesById = new Map(nodes.map((n) => [n.id, n]));
+    const links = GRAPH_LINKS.map((link) => ({
+        ...link,
+        status: deriveGraphLinkStatus({
+            link,
+            nodesById,
+            replayStatus,
+            capturedRunStatus: captured,
+            hasGitInfo: hasGit,
+            hasDiffInfo: diffOk,
+        }),
+    }));
     return {
         nodes,
         links,
+        laneLabels: ["Recorder Pipeline", "Captured Run", "Repository"],
         legend: [
             { label: "Completed", status: "completed" },
             { label: "Minor", status: "completed" },

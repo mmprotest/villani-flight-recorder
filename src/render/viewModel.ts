@@ -75,11 +75,13 @@ export interface GraphLinkViewModel {
   id: string;
   from: string;
   to: string;
+  kind?: string;
   status: Exclude<Status, "skipped">;
 }
 export interface ExecutionGraphViewModel {
   nodes: GraphNodeViewModel[];
   links: GraphLinkViewModel[];
+  laneLabels?: string[];
   legend: { label: string; status: Status }[];
 }
 export interface ReplayDashboardViewModel {
