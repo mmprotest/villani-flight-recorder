@@ -1,6 +1,7 @@
 import { GRAPH_COORDS } from "./graphGeometry.js";
 import { deriveCapturedRunStatus } from "./deriveCapturedRunStatus.js";
 import { deriveReplayStatus } from "./deriveReplayStatus.js";
+import { pluralize } from "./format.js";
 export const GRAPH_LINKS = [
     {
         id: "discover-parse",
@@ -56,12 +57,6 @@ export const GRAPH_LINKS = [
         to: "diff-capture",
         kind: "repo_artifact",
     },
-    {
-        id: "diff-capture-file-changes",
-        from: "diff-capture",
-        to: "file-changes",
-        kind: "repo_artifact",
-    },
 ];
 const gitAvailable = (git) => Boolean(git?.head || git?.status || git?.diff || git?.diffStat);
 const statusFromSeverity = (s) => s === "failed"
@@ -71,7 +66,7 @@ const statusFromSeverity = (s) => s === "failed"
         : s === "skipped" || s === "unavailable"
             ? "skipped"
             : "completed";
-const node = (id, title, severity, subtitle, icon, badgeLabel) => ({
+const node = (id, title, severity, subtitle, icon, badgeLabel, laneTone) => ({
     id,
     title,
     severity,
@@ -79,6 +74,7 @@ const node = (id, title, severity, subtitle, icon, badgeLabel) => ({
     subtitle,
     icon,
     badgeLabel,
+    laneTone,
     badgeTone: severity === "minor-warning"
         ? "minor-warning"
         : severity === "unavailable" || severity === "skipped"
@@ -192,8 +188,8 @@ export function deriveExecutionGraph(input) {
             ? "none"
             : "failed", session.sessionPath ? "session found" : "source context", "discover"),
         node("parse", "Parse", parseSeverity, warnings.length
-            ? `Parsed with ${warnings.length} warnings`
-            : `${events.length} events`, "parse", parseSeverity === "minor-warning" ? "partial" : undefined),
+            ? `Parsed with ${pluralize(warnings.length, "warning")}`
+            : pluralize(events.length, "event"), "parse", parseSeverity === "minor-warning" ? "partial" : undefined),
         node("normalize", "Normalize", events.length ? "none" : "failed", events.length ? "normalized events" : "empty timeline", "normalize"),
         node("agent-events", "Agent Events", agentSeverity, captured.status === "not_applicable"
             ? "Git-only replay"
@@ -203,30 +199,24 @@ export function deriveExecutionGraph(input) {
             ? "N/A"
             : agentSeverity === "minor-warning"
                 ? "partial"
-                : undefined),
-        node("commands", "Commands / Tools", commandSeverity, captured.status === "not_applicable"
-            ? "Not captured"
-            : captured.failedTests
-                ? `${captured.failedTests} failed tests`
-                : captured.failedCommands
-                    ? `${captured.failedCommands} failed commands`
-                    : captured.totalCommands || captured.totalTests
-                        ? "commands passed"
-                        : "no command data", "terminal", captured.status === "not_applicable"
+                : undefined, captured.status === "not_applicable" ? "dimmed" : undefined),
+        node("commands", "Commands", commandSeverity, captured.status === "not_applicable"
+            ? "Tools and tests"
+            : "Tools and tests", "terminal", captured.status === "not_applicable"
             ? "N/A"
             : commandSeverity === "failed"
                 ? "FAILED"
                 : commandSeverity === "unavailable"
                     ? "N/A"
-                    : undefined),
+                    : undefined, captured.status === "not_applicable" ? "dimmed" : undefined),
         node("file-changes", "File Changes", fileSeverity, captured.status === "not_applicable"
             ? "From commits"
             : captured.fileEdits
                 ? `${captured.fileEdits} edits captured`
                 : "none captured", "edit", fileSeverity === "unavailable" ? "N/A" : undefined),
-        node("correlate", "Correlate", hasGit ? "none" : "unavailable", hasGit ? "repo metadata" : "not a git repo", "correlate", hasGit ? undefined : "not captured"),
-        node("git-state", "Git State", hasGit ? "none" : "unavailable", git?.head ? git.head.slice(0, 12) : "not a git repo", "branch", hasGit ? undefined : "not captured"),
-        node("diff-capture", "Diff Capture", diffOk ? "none" : hasGit ? "minor-warning" : "unavailable", diffOk ? "diff available" : "no git diff captured", "edit", diffOk ? undefined : "not captured"),
+        node("correlate", "Correlate", hasGit ? "none" : "unavailable", hasGit ? "repo metadata" : "not a git repo", "correlate", hasGit ? undefined : "not captured", captured.status === "not_applicable" && hasGit ? "emphasis" : undefined),
+        node("git-state", "Git State", hasGit ? "none" : "unavailable", git?.head ? git.head.slice(0, 12) : "not a git repo", "branch", hasGit ? undefined : "not captured", captured.status === "not_applicable" && hasGit ? "emphasis" : undefined),
+        node("diff-capture", "Diff Capture", diffOk ? "none" : hasGit ? "minor-warning" : "unavailable", diffOk ? "diff available" : "no git diff captured", "edit", diffOk ? undefined : "not captured", captured.status === "not_applicable" && hasGit ? "emphasis" : undefined),
         node("replay-output", "Replay Output", outputSeverity, replayStatus.status === "generated"
             ? "HTML written"
             : replayStatus.reason, "flag", outputSeverity === "failed"

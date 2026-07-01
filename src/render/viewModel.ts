@@ -70,6 +70,7 @@ export interface GraphNodeViewModel {
   width: number;
   height: number;
   detail: DetailViewModel;
+  laneTone?: "normal" | "dimmed" | "emphasis";
 }
 export interface GraphLinkViewModel {
   id: string;

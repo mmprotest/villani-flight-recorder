@@ -1,6 +1,7 @@
 import { FlightEvent } from "../providers/types.js";
 import { isTestCommand } from "../normalize/events.js";
 import { CapturedRunStatusSummary } from "./statusTypes.js";
+import { pluralize } from "./format.js";
 
 const cmdTypes = new Set([
   "bash_command",
@@ -92,8 +93,8 @@ export function deriveCapturedRunStatus(
       label: "Failed",
       tone: "error",
       reason: failedTests
-        ? `${failedTests} failed tests`
-        : `${failedCommands} failed commands`,
+        ? pluralize(failedTests, "failed test")
+        : pluralize(failedCommands, "failed command"),
       failedCommands,
       failedTests,
       totalCommands,
@@ -119,7 +120,7 @@ export function deriveCapturedRunStatus(
       status: "partial",
       label: "Partial",
       tone: "warning",
-      reason: `${unknown} unknown events`,
+      reason: pluralize(unknown, "unknown event"),
       failedCommands,
       failedTests,
       totalCommands,

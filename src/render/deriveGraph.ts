@@ -15,6 +15,7 @@ import {
 } from "./statusTypes.js";
 import { deriveCapturedRunStatus } from "./deriveCapturedRunStatus.js";
 import { deriveReplayStatus } from "./deriveReplayStatus.js";
+import { pluralize } from "./format.js";
 
 export interface GraphDerivationInput {
   session: ParsedSession;
@@ -96,12 +97,6 @@ export const GRAPH_LINKS: GraphLinkDefinition[] = [
     to: "diff-capture",
     kind: "repo_artifact",
   },
-  {
-    id: "diff-capture-file-changes",
-    from: "diff-capture",
-    to: "file-changes",
-    kind: "repo_artifact",
-  },
 ];
 
 const gitAvailable = (git: GitInfo | null) =>
@@ -121,6 +116,7 @@ const node = (
   subtitle: string,
   icon: IconName,
   badgeLabel?: string,
+  laneTone?: GraphNodeViewModel["laneTone"],
 ): GraphNodeViewModel => ({
   id,
   title,
@@ -129,6 +125,7 @@ const node = (
   subtitle,
   icon,
   badgeLabel,
+  laneTone,
   badgeTone:
     severity === "minor-warning"
       ? "minor-warning"
@@ -282,8 +279,8 @@ export function deriveExecutionGraph(
       "Parse",
       parseSeverity,
       warnings.length
-        ? `Parsed with ${warnings.length} warnings`
-        : `${events.length} events`,
+        ? `Parsed with ${pluralize(warnings.length, "warning")}`
+        : pluralize(events.length, "event"),
       "parse",
       parseSeverity === "minor-warning" ? "partial" : undefined,
     ),
@@ -309,20 +306,15 @@ export function deriveExecutionGraph(
         : agentSeverity === "minor-warning"
           ? "partial"
           : undefined,
+      captured.status === "not_applicable" ? "dimmed" : undefined,
     ),
     node(
       "commands",
-      "Commands / Tools",
+      "Commands",
       commandSeverity,
       captured.status === "not_applicable"
-        ? "Not captured"
-        : captured.failedTests
-          ? `${captured.failedTests} failed tests`
-          : captured.failedCommands
-            ? `${captured.failedCommands} failed commands`
-            : captured.totalCommands || captured.totalTests
-              ? "commands passed"
-              : "no command data",
+        ? "Tools and tests"
+        : "Tools and tests",
       "terminal",
       captured.status === "not_applicable"
         ? "N/A"
@@ -331,6 +323,7 @@ export function deriveExecutionGraph(
           : commandSeverity === "unavailable"
             ? "N/A"
             : undefined,
+      captured.status === "not_applicable" ? "dimmed" : undefined,
     ),
     node(
       "file-changes",
@@ -351,6 +344,7 @@ export function deriveExecutionGraph(
       hasGit ? "repo metadata" : "not a git repo",
       "correlate",
       hasGit ? undefined : "not captured",
+      captured.status === "not_applicable" && hasGit ? "emphasis" : undefined,
     ),
     node(
       "git-state",
@@ -359,6 +353,7 @@ export function deriveExecutionGraph(
       git?.head ? git.head.slice(0, 12) : "not a git repo",
       "branch",
       hasGit ? undefined : "not captured",
+      captured.status === "not_applicable" && hasGit ? "emphasis" : undefined,
     ),
     node(
       "diff-capture",
@@ -367,6 +362,7 @@ export function deriveExecutionGraph(
       diffOk ? "diff available" : "no git diff captured",
       "edit",
       diffOk ? undefined : "not captured",
+      captured.status === "not_applicable" && hasGit ? "emphasis" : undefined,
     ),
     node(
       "replay-output",

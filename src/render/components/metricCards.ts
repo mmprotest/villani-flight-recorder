@@ -18,7 +18,7 @@ const statusCard = (vm: ReplayDashboardViewModel, m: MetricCardViewModel) => {
     vm.capturedRunStatus.status === "not_applicable"
       ? vm.capturedRunStatus.label
       : `${vm.capturedRunStatus.label}${vm.capturedRunStatus.reason ? `, ${vm.capturedRunStatus.reason}` : ""}`;
-  return `<article class="metric-card status-card ${m.tone ?? ""}"><div class="metric-label">${icon(m.icon)}<span>${escapeHtml(m.label)}</span></div><div class="status-card-body"><div class="status-stack-row">${statusDot(m.tone)}<div><div class="status-stack-label">REPLAY</div><div class="status-stack-value">${escapeHtml(vm.replayStatus.label)}</div></div></div><div class="status-stack-row">${statusDot(capturedTone)}<div><div class="status-stack-label">CAPTURED</div><div class="status-stack-value">${escapeHtml(capturedValue)}</div></div></div></div></article>`;
+  return `<article class="metric-card status-card ${m.tone ?? ""}"><div class="metric-label">${icon(m.icon)}<span>${escapeHtml(m.label)}</span></div><div class="status-card-body"><div class="status-stack-row"><div class="status-stack-label">${statusDot(m.tone)}REPLAY</div><div class="status-stack-value">${escapeHtml(vm.replayStatus.label)}</div></div><div class="status-stack-row"><div class="status-stack-label">${statusDot(capturedTone)}CAPTURED</div><div class="status-stack-value">${escapeHtml(capturedValue)}</div></div></div></article>`;
 };
 
 const normalCard = (m: MetricCardViewModel) =>
