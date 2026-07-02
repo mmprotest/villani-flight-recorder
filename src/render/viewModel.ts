@@ -10,7 +10,12 @@ import {
   CapturedRunStatusSummary,
   ReplayStatusSummary,
 } from "./statusTypes.js";
-import { changedFilesFromGit, diffFromGit } from "./deriveDetails.js";
+import {
+  changedFilesFromEvents,
+  changedFilesFromGit,
+  diffFromEvents,
+  diffFromGit,
+} from "./deriveDetails.js";
 
 export type Status =
   "completed" | "running" | "warning" | "failed" | "pending" | "skipped";
@@ -179,8 +184,13 @@ export function deriveReplayViewModel(
     details: timeline[0]?.detail ?? { title: "No event" },
     warnings,
     rawEvents: events,
-    changedFiles: changedFilesFromGit(git),
-    diff: diffFromGit(git),
+    changedFiles: [
+      ...new Set([
+        ...changedFilesFromGit(git),
+        ...changedFilesFromEvents(events),
+      ]),
+    ],
+    diff: diffFromGit(git) || diffFromEvents(events) || "Not captured",
     provider: session.provider,
     redactionReport: (session as ParsedSession & { redactionReport?: unknown })
       .redactionReport,
