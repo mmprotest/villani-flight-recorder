@@ -14,7 +14,7 @@ export const eventSeverity = (e) => e.type === "error" || (e.exitCode ?? 0) !== 
 function timelineCopy(e) {
     if (e.type === "test_run" && e.command && (e.exitCode ?? 0) !== 0) {
         return {
-            title: `Test failed: ${e.command}`,
+            title: `Command failed: ${e.command}`,
             subtitle: "Captured test command failed",
         };
     }
@@ -69,6 +69,22 @@ const commandHasResult = (e) => e.exitCode !== undefined ||
     rawIsError(e);
 const commandIsStart = (e) => Boolean(e.command) && !commandHasResult(e);
 const commandIsResult = (e) => Boolean(e.command) && commandHasResult(e);
+const rawObj = (e) => e.raw && typeof e.raw === "object" && !Array.isArray(e.raw)
+    ? e.raw
+    : {};
+const commandLifecycleKey = (e) => {
+    const raw = rawObj(e);
+    const candidates = [
+        raw.tool_use_id,
+        raw.tool_call_id,
+        raw.call_id,
+        raw.parent_id,
+        raw.command_id,
+        raw.provider_command_id,
+    ];
+    const value = candidates.find((v) => typeof v === "string" && v.trim().length > 0);
+    return typeof value === "string" ? value : undefined;
+};
 function groupedCommandEvent(start, result) {
     const started = start.timestamp
         ? new Date(start.timestamp).getTime()
@@ -85,45 +101,67 @@ function groupedCommandEvent(start, result) {
         ...start,
         ...result,
         id: `${start.id}+${result.id}`,
+        type: result.type,
         title: result.title || start.title,
         summary: result.summary || start.summary,
         command: start.command || result.command,
         durationMs,
         raw: {
             kind: "grouped_command_lifecycle",
+            status: result.type === "error" ||
+                (result.exitCode ?? 0) !== 0 ||
+                rawIsError(result)
+                ? "failed"
+                : result.exitCode === 0
+                    ? "succeeded"
+                    : "unknown",
+            command: start.command || result.command,
+            exitCode: result.exitCode,
+            stdout: result.stdout,
+            stderr: result.stderr,
             start,
             result,
             startTime: start.timestamp,
             endTime: result.timestamp,
+            lifecycleKey: commandLifecycleKey(start) ?? commandLifecycleKey(result),
         },
     };
 }
 function groupCommandLifecycle(events) {
     const grouped = [];
     const pending = [];
-    for (const event of events) {
+    const flushStale = (index) => {
+        while (pending.length &&
+            !pending[0].key &&
+            index - pending[0].index > 3) {
+            grouped.push(pending.shift().event);
+        }
+    };
+    for (let index = 0; index < events.length; index++) {
+        const event = events[index];
         if (commandIsResult(event)) {
-            const match = pending.findIndex((p) => p.command === event.command);
+            const key = commandLifecycleKey(event);
+            let match = key ? pending.findIndex((p) => p.key === key) : -1;
+            if (match < 0) {
+                match = pending.findIndex((p) => p.event.command === event.command && index - p.index <= 3);
+            }
             if (match >= 0) {
-                const [start] = pending.splice(match, 1);
-                grouped.push(groupedCommandEvent(start, event));
+                const earlier = pending.splice(0, match);
+                grouped.push(...earlier.map((p) => p.event));
+                const [start] = pending.splice(0, 1);
+                grouped.push(groupedCommandEvent(start.event, event));
                 continue;
             }
         }
+        flushStale(index);
         if (commandIsStart(event)) {
-            pending.push(event);
+            pending.push({ event, index, key: commandLifecycleKey(event) });
             continue;
         }
-        if (pending.length && event.type === "tool_result") {
-            grouped.push(event);
-            continue;
-        }
-        while (pending.length)
-            grouped.push(pending.shift());
         grouped.push(event);
     }
     while (pending.length)
-        grouped.push(pending.shift());
+        grouped.push(pending.shift().event);
     return grouped;
 }
 export function deriveTimeline(events) {
