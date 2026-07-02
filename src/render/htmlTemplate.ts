@@ -5,7 +5,7 @@ import { clientScript } from "./clientScript.js";
 
 export function htmlTemplate(vm: ReplayDashboardViewModel, body: string) {
   const data = {
-    events: vm.rawEvents,
+    events: vm.timeline.map((event) => event.raw),
     timeline: vm.timeline,
     graph: vm.graph.nodes,
     provider: vm.provider,

@@ -5,3 +5,5 @@ node_modules/
 .villani-flight-recorder/screenshots/
 
 .villani-flight-recorder/manual/
+
+.artifacts/

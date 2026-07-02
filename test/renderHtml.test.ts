@@ -122,12 +122,9 @@ describe("rendered HTML", () => {
       "Captured agent run",
     );
     expect(doc.querySelector("#detailContent")?.textContent).toContain(
-      "Captured run failed",
+      "The replay was generated successfully, but the captured agent command failed.",
     );
-    expect(doc.querySelector("#detailContent")?.textContent).toContain(
-      "replay was generated successfully",
-    );
-    expect(doc.querySelector("#detailContent")?.textContent).toContain(
+    expect(doc.querySelector("#detailContent")?.textContent).not.toContain(
       "captured run contains a failed command",
     );
     expect(html).not.toContain(
@@ -222,9 +219,75 @@ describe("timeline correlated command failures", () => {
     const npmTestItems = timeline.filter((e) => e.raw.command === "npm test");
     expect(npmTestItems).toHaveLength(1);
     expect(npmTestItems[0]?.status).toBe("failed");
-    expect(npmTestItems[0]?.title).toMatch(/failed/i);
+    expect(npmTestItems[0]?.title).toBe("Command failed: npm test");
     expect(npmTestItems[0]?.raw.raw).toMatchObject({
       kind: "grouped_command_lifecycle",
     });
+  });
+
+  it("groups Claude command start and failed result into one primary item with raw metadata", async () => {
+    const dir = await mkdtemp(path.join(os.tmpdir(), "vfr-claude-group-"));
+    const file = path.join(dir, "session.jsonl");
+    await writeFile(
+      file,
+      [
+        JSON.stringify({
+          type: "assistant",
+          message: {
+            role: "assistant",
+            content: [
+              {
+                type: "tool_use",
+                id: "toolu_test_group",
+                name: "Bash",
+                input: { command: "npm test" },
+              },
+            ],
+          },
+        }),
+        JSON.stringify({
+          type: "user",
+          message: {
+            role: "user",
+            content: [
+              {
+                type: "tool_result",
+                tool_use_id: "toolu_test_group",
+                content: "Tests failed",
+                is_error: true,
+              },
+            ],
+          },
+        }),
+      ].join("\n"),
+    );
+    const session = await parseClaudeSession(file);
+    const timeline = deriveTimeline(session.events);
+    const npmTestItems = timeline.filter((e) => e.raw.command === "npm test");
+    expect(npmTestItems).toHaveLength(1);
+    expect(npmTestItems[0]?.title).toBe("Command failed: npm test");
+    expect(npmTestItems[0]?.raw.exitCode).toBe(1);
+    expect(npmTestItems[0]?.raw.raw).toMatchObject({
+      kind: "grouped_command_lifecycle",
+      command: "npm test",
+      exitCode: 1,
+    });
+
+    const html = await fs.readFile(
+      await renderReplay(session, { cwd: process.cwd() }),
+      "utf8",
+    );
+    const doc = new JSDOM(html, { runScripts: "dangerously" }).window.document;
+    const primaryRows = [...doc.querySelectorAll(".timeline-title")].map(
+      (n) => n.textContent ?? "",
+    );
+    expect(primaryRows.filter((t) => t.includes("npm test"))).toEqual([
+      "Command failed: npm test",
+    ]);
+    expect(primaryRows).not.toContain("Ran npm test");
+    expect(primaryRows).not.toContain("Test failed: npm test");
+    expect(doc.body.textContent).toContain("Exit code");
+    expect(doc.body.textContent).toContain("1");
+    expect(doc.body.textContent).toContain("grouped_command_lifecycle");
   });
 });
