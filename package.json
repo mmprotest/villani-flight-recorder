@@ -4,7 +4,8 @@
   "description": "Local-first static replay generator for AI coding agent sessions and git history.",
   "type": "module",
   "bin": {
-    "villani-flight-recorder": "dist/cli.js"
+    "villani-flight-recorder": "dist/cli.js",
+    "vfr": "dist/cli.js"
   },
   "files": [
     "dist",

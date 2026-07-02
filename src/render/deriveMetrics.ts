@@ -7,11 +7,17 @@ import {
 const task = (s: ParsedSession) =>
   s.events.find((e) => e.type === "user_message")?.summary ??
   s.events.find((e) => e.type === "user_message")?.title ??
-  "Unknown task";
+  (s.provider === "unknown" ? "Task unavailable" : "Task unavailable");
 export const runnerLabel = (p: string) =>
-  ({ claude: "Claude Code", codex: "Codex", pi: "Pi", git: "Git Replay" })[p] ??
+  ({
+    claude: "Claude Code",
+    codex: "Codex",
+    pi: "Pi",
+    git: "Git Replay",
+    unknown: "Generic replay",
+  })[p] ??
   p ??
-  "Unknown";
+  "Generic replay";
 export function deriveMetrics(
   session: ParsedSession,
   replayStatus: ReplayStatusSummary,
@@ -23,7 +29,7 @@ export function deriveMetrics(
           new Date(session.endedAt).getTime() -
             new Date(session.startedAt).getTime(),
         )
-      : "Not captured";
+      : "Duration unavailable";
   return [
     {
       id: "task",
@@ -35,7 +41,7 @@ export function deriveMetrics(
     {
       id: "model",
       label: "MODEL",
-      value: session.model ?? "Unknown model",
+      value: session.model ?? "Provider format unknown",
       subvalue: session.model
         ? "Captured model metadata"
         : `${runnerLabel(session.provider)} session`,
@@ -95,7 +101,7 @@ export function deriveMetrics(
         ? `Started ${fmtTime(session.startedAt)}`
         : "No duration captured",
       icon: "clock",
-      empty: dur === "Not captured",
+      empty: dur === "Duration unavailable",
     },
     {
       id: "runid",

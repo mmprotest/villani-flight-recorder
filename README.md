@@ -24,11 +24,11 @@ npm test
 npm run typecheck
 ```
 
-During local development, run the CLI through npm so it uses this checkout instead of assuming a global binary exists:
+During local development, run the CLI through npm so it uses this checkout instead of assuming a global binary exists. The package exposes both `villani-flight-recorder` and the short `vfr` alias:
 
 ```bash
 npm exec -- villani-flight-recorder scan --provider claude
-npm exec -- villani-flight-recorder replay --provider claude --latest
+npm exec -- vfr replay --provider claude --latest
 npm exec -- villani-flight-recorder replay --session path/to/session.jsonl --provider codex
 ```
 
@@ -62,7 +62,7 @@ Minimal git replay example:
 
 ```bash
 npm run build
-node dist/cli.js git-replay --from HEAD~1 --to HEAD
+node dist/cli.js git-replay --repo . --from HEAD~1 --to HEAD
 ```
 
 Example output path:
@@ -90,7 +90,7 @@ villani-flight-recorder replay --provider claude --latest
 villani-flight-recorder replay --provider codex --latest
 villani-flight-recorder replay --provider pi --latest
 villani-flight-recorder replay --session <path-to-jsonl> --provider <claude|codex|pi>
-villani-flight-recorder git-replay --from <ref> --to <ref>
+villani-flight-recorder git-replay --repo <repo-path> --from <ref> --to <ref>
 villani-flight-recorder install-hooks
 villani-flight-recorder hook <provider>
 ```
@@ -123,7 +123,7 @@ It writes JSONL into `.villani-flight-recorder/hooks/`, includes a received time
 
 ## Git-only replay limitations
 
-Git-only replay cannot know agent reasoning, uncommitted failed attempts, tool calls, approvals, or commands unless those details are present in commits. It does not re-execute commands and does not mutate the repository.
+Git-only replay cannot know agent reasoning, uncommitted failed attempts, tool calls, approvals, or commands unless those details are present in commits. It does not re-execute commands and does not mutate the repository. Pass `--repo <path>` to replay a repository other than the current working directory; if omitted, the current directory is used.
 
 ## Known limitations
 
@@ -174,10 +174,9 @@ Common launch commands:
 
 ```bash
 vfr scan --all
-vfr scan --agent claude --root <path>
-vfr scan --agent codex --root <path>
-vfr scan --agent pi --root <path>
-vfr scan --agent generic --root <path>
+vfr scan --provider claude --root <path>
+vfr scan --provider codex --root <path>
+vfr scan --provider pi --root <path>
 vfr sessions
 vfr tasks
 vfr replay --latest
@@ -191,7 +190,7 @@ Manual fallback remains available:
 
 ```bash
 vfr replay --session path/to/session.jsonl --provider claude
-vfr git-replay --repo . --from HEAD~1 --to HEAD
+vfr git-replay --repo . --from HEAD~1 --to HEAD --out /tmp/vfr-git-demo.html
 ```
 
 `vfr scan` records source file paths, fingerprints, small titles/summaries derived from local content, inferred repos, and recorder warnings. It does not copy giant raw transcript bodies into the index or upload data.

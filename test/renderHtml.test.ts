@@ -122,7 +122,7 @@ describe("rendered HTML", () => {
       "Captured agent run",
     );
     expect(doc.querySelector("#detailContent")?.textContent).toContain(
-      "The replay was generated successfully, but the captured agent command failed.",
+      "The replay was generated successfully, but the captured agent command failed. Investigate this command before trusting the run outcome.",
     );
     expect(doc.querySelector("#detailContent")?.textContent).not.toContain(
       "captured run contains a failed command",
@@ -157,6 +157,36 @@ describe("rendered HTML", () => {
     expect(doc.querySelector("#detailContent pre")?.textContent).toContain(
       "id",
     );
+  });
+
+  it("renders generic replay summary with intentional fallback labels", async () => {
+    const html = await fs.readFile(
+      await renderReplay(
+        {
+          provider: "unknown",
+          sessionPath: "generic.jsonl",
+          events: [
+            {
+              id: "g1",
+              provider: "unknown",
+              type: "unknown",
+              title: "Generic replay",
+            },
+          ],
+          warnings: [],
+        },
+        { cwd: process.cwd() },
+      ),
+      "utf8",
+    );
+    const doc = new JSDOM(html).window.document;
+    const primarySummary =
+      doc.querySelector(".summary-facts")?.textContent ?? "";
+    expect(primarySummary).toContain("Generic replay");
+    expect(primarySummary).toContain("Provider format unknown");
+    expect(primarySummary).not.toContain("Unknown model");
+    expect(primarySummary).not.toContain("Unknown task");
+    expect(primarySummary).not.toContain("Not captured duration");
   });
 
   it("safeJsonForScript escapes closing script tags", () => {
