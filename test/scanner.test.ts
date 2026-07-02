@@ -7,10 +7,9 @@ import { appendHook } from "../src/hooks/installHooks.js";
 const fx = (p: string) => path.resolve("test/fixtures", p);
 
 describe("scanner and hooks", () => {
-  it("scan --root requires provider and respects custom CODEX_HOME", async () => {
-    await expect(findSessions({ roots: [fx("claude")] })).rejects.toThrow(
-      /--root requires --provider/,
-    );
+  it("scan --root auto-detects providers and respects custom CODEX_HOME", async () => {
+    const auto = await findSessions({ roots: [fx("claude")] });
+    expect(auto.some((x) => x.provider === "claude")).toBe(true);
     const s = await findSessions({ roots: [fx("claude")], provider: "claude" });
     expect(s.every((x) => x.provider === "claude")).toBe(true);
     const old = process.env.CODEX_HOME;

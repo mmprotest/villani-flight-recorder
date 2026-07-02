@@ -10,17 +10,19 @@ import { openBrowser } from "./utils/openBrowser.js";
 import { buildGitReplay } from "./git/gitReplay.js";
 import { installHooks, appendHook } from "./hooks/installHooks.js";
 import { scanToIndex } from "./index/sessionIndex.js";
-import { readIndex } from "./index/sessionStore.js";
+import { readIndex, defaultIndexDir } from "./index/sessionStore.js";
+import { renderSessionBrowser } from "./render/sessionBrowser.js";
 import { adaptersFor } from "./providers/providerAdapter.js";
 import fs from "node:fs/promises";
 import path from "node:path";
 const program = new Command();
 program
     .name("villani-flight-recorder")
-    .description("Black box recorder for AI coding agents")
+    .description("Black box recorder for AI coding agents\n\nCommon workflow:\n  vfr scan\n  vfr browse\n  vfr replay --id <session-id>")
     .version("0.1.0");
 program
     .command("scan")
+    .description("Scans known Claude, Codex, and Pi session directories by default. Use --root to scan a custom directory.")
     .option("--all")
     .option("--agent <agent>")
     .option("--provider <provider>")
@@ -60,7 +62,7 @@ program
     console.log(`- ${summary.repos} repos`);
     console.log(`- ${summary.failedCommands} failed commands`);
     console.log(`- ${summary.warnings} recorder warnings`);
-    console.log("\nNext:\n  vfr sessions\n  vfr tasks\n  vfr replay --latest");
+    console.log("\nNext:\n  vfr sessions\n  vfr browse\n  vfr replay --id <session-id>");
 });
 async function parse(provider, file) {
     if (provider === "claude")
@@ -88,7 +90,10 @@ async function requireIndex(dir) {
 program
     .command("sessions")
     .option("--agent <agent>")
+    .option("--provider <provider>")
     .option("--repo <repo>")
+    .option("--project <name>")
+    .option("--failed")
     .option("--limit <n>")
     .option("--json")
     .option("--index-dir <path>")
@@ -98,24 +103,37 @@ program
         return;
     let rows = idx.sessions
         .filter((s) => (!o.agent || s.provider === o.agent) &&
+        (!o.provider || s.provider === o.provider) &&
+        (!o.failed || s.outcome === "failed" || s.failedCommandCount > 0) &&
+        (!o.project ||
+            (s.projectName ?? "").includes(o.project) ||
+            (s.projectPath ?? "").includes(o.project)) &&
         repoMatches([...s.repoRoots, ...s.repoIds], o.repo))
-        .sort((a, b) => String(b.lastEventAt ?? "").localeCompare(String(a.lastEventAt ?? "")))
+        .sort((a, b) => String(b.updatedAt ?? b.lastEventAt ?? "").localeCompare(String(a.updatedAt ?? a.lastEventAt ?? "")))
         .slice(0, o.limit ? Number(o.limit) : 20);
     if (o.json)
         return console.log(JSON.stringify(rows, null, 2));
     if (!rows.length)
-        return console.log("No sessions found. Run: vfr scan --all");
-    console.log("Recent sessions\n");
-    rows.forEach((s, i) => {
-        const repo = idx.repos.find((r) => s.repoIds.includes(r.id));
-        console.log(`${i + 1}. ${s.id}\n   Agent: ${s.providerLabel}\n   Repo: ${repo?.name ?? "Provider format unknown"}\n   Events: ${s.eventCount}\n   Task segments: ${s.taskSegmentIds.length}\n   Failed commands: ${s.failedCommandCount}\n   Last active: ${s.lastEventAt ?? "Duration unavailable"}\n`);
-    });
+        return console.log("No sessions indexed yet. Run `vfr scan` to index local agent sessions.");
+    console.log("ID                 Agent   Outcome  Project              Updated               Events  Failed  Title / First Prompt");
+    for (const s of rows) {
+        const project = (s.projectName ??
+            idx.repos.find((r) => s.repoIds.includes(r.id))?.name ??
+            "-").slice(0, 20);
+        const title = (s.title ?? s.firstPrompt ?? "-")
+            .replace(/\s+/g, " ")
+            .slice(0, 60);
+        console.log(`${s.id.padEnd(18)} ${String(s.provider).padEnd(7)} ${String(s.outcome ?? "unknown").padEnd(8)} ${project.padEnd(20)} ${String(s.updatedAt ?? s.lastEventAt ?? "-").padEnd(20)} ${String(s.eventCount).padEnd(7)} ${String(s.failedCommandCount).padEnd(7)} ${title}`);
+    }
 });
 program
     .command("tasks")
     .option("--session <session>")
     .option("--agent <agent>")
+    .option("--provider <provider>")
     .option("--repo <repo>")
+    .option("--project <name>")
+    .option("--failed")
     .option("--limit <n>")
     .option("--json")
     .option("--index-dir <path>")
@@ -140,6 +158,45 @@ program
     });
 });
 program
+    .command("browse")
+    .description("Generates a local HTML session browser from the indexed sessions.")
+    .option("--out <path>")
+    .option("--index-dir <path>")
+    .option("--open")
+    .action(async (o) => {
+    const idx = await requireIndex(o.indexDir);
+    if (!idx)
+        return;
+    const base = o.indexDir ?? defaultIndexDir();
+    const out = o.out ?? path.join(base, "session-browser.html");
+    const replayDir = path.join(base, "replays");
+    await fs.mkdir(replayDir, { recursive: true });
+    for (const s of idx.sessions) {
+        const ad = adaptersFor(String(s.provider))[0];
+        if (!ad)
+            continue;
+        try {
+            const parsed = await ad.parse({
+                provider: s.provider,
+                sourcePath: s.sourcePath,
+                sourceKind: "file",
+                confidence: s.confidence,
+                reason: "browser replay",
+            });
+            await renderReplay(parsed, {
+                out: path.join(replayDir, `${s.id}.html`),
+            });
+        }
+        catch { }
+    }
+    await fs.mkdir(path.dirname(out), { recursive: true });
+    await fs.writeFile(out, renderSessionBrowser(idx, { replayDir, browserOut: out }));
+    console.log(`Session browser written to ${out}`);
+    console.log("Open it in your browser.");
+    if (o.open)
+        openBrowser(out);
+});
+program
     .command("open")
     .option("--out <path>")
     .option("--index-dir <path>")
@@ -158,6 +215,7 @@ program
     .option("--open")
     .option("--provider <provider>")
     .option("--session <path>")
+    .option("--id <session-id>")
     .option("--segment <segment>")
     .option("--repo <repo>")
     .option("--index-dir <path>")
@@ -166,12 +224,13 @@ program
     .option("--no-redact")
     .option("--redact")
     .action(async (o) => {
-    if (!o.latest && !o.session && !o.segment && !o.repo)
-        throw new Error("replay requires --latest, --session <path-or-id>, --segment <id>, or --repo <path-or-id>");
+    if (!o.latest && !o.session && !o.id && !o.segment && !o.repo)
+        throw new Error("replay requires --latest, --id <session-id>, --session <path-or-id>, --segment <id>, or --repo <path-or-id>");
     let session;
     let selectedSessionId;
     let selectedSegmentId;
-    if (o.segment ||
+    if (o.id ||
+        o.segment ||
         o.repo ||
         (o.latest && !o.root) ||
         (o.session &&
@@ -195,9 +254,11 @@ program
                 .filter((t) => (!o.provider || t.provider === o.provider) &&
                 repoMatches([...t.repoRoots, ...t.repoIds], o.repo))
                 .sort((a, b) => String(b.lastEventAt ?? "").localeCompare(String(a.lastEventAt ?? "")))[0];
-        const rec = o.session
-            ? idx.sessions.find((s) => s.id === o.session)
-            : idx.sessions.find((s) => s.id === seg?.sessionId);
+        const rec = o.id
+            ? idx.sessions.find((s) => s.id === o.id)
+            : o.session
+                ? idx.sessions.find((s) => s.id === o.session)
+                : idx.sessions.find((s) => s.id === seg?.sessionId);
         if (!rec && !seg)
             throw new Error("Replay selector did not match any indexed session or segment. Run: vfr sessions or vfr tasks");
         const srec = rec ?? idx.sessions.find((s) => s.id === seg.sessionId);
@@ -241,7 +302,10 @@ program
     }
     const file = await renderReplay(session, {
         redact: o.redact !== false,
-        out: o.out,
+        out: o.out ??
+            (selectedSessionId && !selectedSegmentId
+                ? path.join(o.indexDir ?? defaultIndexDir(), "replays", `${selectedSessionId}.html`)
+                : undefined),
     });
     if (o.latest) {
         console.log(`Provider: ${session.provider}`);
@@ -251,7 +315,7 @@ program
     }
     else {
         if (selectedSessionId || selectedSegmentId)
-            console.log(`Replay generated\n\nSource:\n- Session: ${selectedSessionId ?? "manual"}\n- Segment: ${selectedSegmentId ?? "full session"}\n- Agent: ${session.provider}\n\nOutput:\n${file}`);
+            console.log(`Replay written to ${file}\nOpen it in your browser.`);
         else
             console.log(file);
     }
