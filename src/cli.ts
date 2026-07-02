@@ -50,9 +50,13 @@ program
     if (!o.latest && !o.session)
       throw new Error("replay requires --latest or --session <path>");
     let session;
-    if (o.session)
+    if (o.session) {
+      if (!o.provider)
+        console.warn(
+          "Warning: Provider could not be confidently detected for a local transcript file. Re-run with --provider claude, --provider codex, or --provider pi for best results.",
+        );
       session = await parse((o.provider ?? "unknown") as Provider, o.session);
-    else {
+    } else {
       const roots = o.root ? [o.root] : undefined;
       const picked = chooseLatest(
         await findSessions({ provider: o.provider, roots }),

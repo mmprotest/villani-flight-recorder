@@ -12,7 +12,7 @@ import { deriveTimeline } from "../src/render/deriveTimeline.js";
 const fx = (p: string) => path.resolve("test/fixtures", p);
 
 describe("rendered HTML", () => {
-  it("contains cockpit UI, status sections, self-contained assets, and valid inline JS", async () => {
+  it("contains forensic report UI, status sections, self-contained assets, and valid inline JS", async () => {
     const s = await parseCodexSession(fx("codex/realistic-rollout.jsonl"));
     const html = await fs.readFile(
       await renderReplay(s, { cwd: process.cwd() }),
@@ -21,7 +21,7 @@ describe("rendered HTML", () => {
     for (const text of [
       "Villani Flight Recorder",
       "Replay Event Timeline",
-      "Execution Graph",
+      "Replay coverage",
       "Captured run outcome",
       "events captured",
       "provider",
@@ -53,7 +53,7 @@ describe("rendered HTML", () => {
     expect(html).toContain("Repository");
     expect(html).toContain("Design tokens");
     expect(html).toContain("Investigation report layout");
-    expect(html).toContain("Execution graph");
+    expect(html).toContain("Replay coverage");
     expect(html).toContain("Detail panel");
     expect(html).not.toMatch(/https?:\/\//);
     for (const match of html.matchAll(/<script>([\s\S]*?)<\/script>/g))
@@ -99,9 +99,8 @@ describe("rendered HTML", () => {
       ),
     ).toBe(false);
     expect(doc.body.textContent).toContain("Source");
-    expect(doc.body.textContent).toContain("Impact");
-    expect(doc.body.textContent).toContain("Replay Impact");
-    expect(doc.body.textContent).toContain("Captured Run Impact");
+    expect(doc.body.textContent).toContain("Replay coverage");
+    expect(doc.body.textContent).toContain("Issue");
     expect(html).not.toContain("N/A NO REPO");
     expect(html).toContain("@media (max-width: 900px)");
     expect(html).toContain("@media (max-width: 520px)");
@@ -126,10 +125,13 @@ describe("rendered HTML", () => {
       "Captured run failed",
     );
     expect(doc.querySelector("#detailContent")?.textContent).toContain(
-      "None, replay generated successfully",
+      "replay was generated successfully",
     );
     expect(doc.querySelector("#detailContent")?.textContent).toContain(
-      "Failed test command",
+      "captured run contains a failed command",
+    );
+    expect(html).not.toContain(
+      ["None", "replay generated successfully"].join(", "),
     );
     expect(doc.querySelector("#detailContent .metadata-strip")).toBeTruthy();
     expect(
@@ -150,7 +152,7 @@ describe("rendered HTML", () => {
 
     doc.querySelector<HTMLElement>("[data-graph-index]")?.click();
     expect(doc.querySelector("#detailContent")?.textContent).toContain(
-      "Replay Impact",
+      "Coverage diagnostic",
     );
     [...doc.querySelectorAll<HTMLElement>(".tab")]
       .find((n) => n.dataset.tab === "Raw JSON")
@@ -210,5 +212,19 @@ describe("timeline correlated command failures", () => {
     expect(failed?.title).toMatch(/failed/i);
     expect(failed?.subtitle).toMatch(/captured/i);
     expect(failed?.title).not.toBe("Transcript parsed with warnings");
+  });
+
+  it("groups adjacent command start and result events into one timeline item", async () => {
+    const session = await parseCodexSession(
+      fx("codex/realistic-rollout.jsonl"),
+    );
+    const timeline = deriveTimeline(session.events);
+    const npmTestItems = timeline.filter((e) => e.raw.command === "npm test");
+    expect(npmTestItems).toHaveLength(1);
+    expect(npmTestItems[0]?.status).toBe("failed");
+    expect(npmTestItems[0]?.title).toMatch(/failed/i);
+    expect(npmTestItems[0]?.raw.raw).toMatchObject({
+      kind: "grouped_command_lifecycle",
+    });
   });
 });

@@ -3,3 +3,5 @@ node_modules/
 .villani-flight-recorder/hooks/
 
 .villani-flight-recorder/screenshots/
+
+.villani-flight-recorder/manual/

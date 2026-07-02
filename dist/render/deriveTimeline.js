@@ -62,8 +62,72 @@ function timelineCopy(e) {
         subtitle: e.summary || e.path || "Recorder pipeline",
     };
 }
+const commandHasResult = (e) => e.exitCode !== undefined ||
+    e.stdout !== undefined ||
+    e.stderr !== undefined ||
+    e.type === "error" ||
+    rawIsError(e);
+const commandIsStart = (e) => Boolean(e.command) && !commandHasResult(e);
+const commandIsResult = (e) => Boolean(e.command) && commandHasResult(e);
+function groupedCommandEvent(start, result) {
+    const started = start.timestamp
+        ? new Date(start.timestamp).getTime()
+        : undefined;
+    const ended = result.timestamp
+        ? new Date(result.timestamp).getTime()
+        : undefined;
+    const durationMs = result.durationMs ??
+        start.durationMs ??
+        (started !== undefined && ended !== undefined
+            ? Math.max(0, ended - started)
+            : undefined);
+    return {
+        ...start,
+        ...result,
+        id: `${start.id}+${result.id}`,
+        title: result.title || start.title,
+        summary: result.summary || start.summary,
+        command: start.command || result.command,
+        durationMs,
+        raw: {
+            kind: "grouped_command_lifecycle",
+            start,
+            result,
+            startTime: start.timestamp,
+            endTime: result.timestamp,
+        },
+    };
+}
+function groupCommandLifecycle(events) {
+    const grouped = [];
+    const pending = [];
+    for (const event of events) {
+        if (commandIsResult(event)) {
+            const match = pending.findIndex((p) => p.command === event.command);
+            if (match >= 0) {
+                const [start] = pending.splice(match, 1);
+                grouped.push(groupedCommandEvent(start, event));
+                continue;
+            }
+        }
+        if (commandIsStart(event)) {
+            pending.push(event);
+            continue;
+        }
+        if (pending.length && event.type === "tool_result") {
+            grouped.push(event);
+            continue;
+        }
+        while (pending.length)
+            grouped.push(pending.shift());
+        grouped.push(event);
+    }
+    while (pending.length)
+        grouped.push(pending.shift());
+    return grouped;
+}
 export function deriveTimeline(events) {
-    return events.map((e) => ({
+    return groupCommandLifecycle(events).map((e) => ({
         id: e.id,
         timestamp: e.timestamp,
         title: timelineCopy(e).title,
@@ -93,7 +157,7 @@ export function deriveTimeline(events) {
                     ? "Git diff captured"
                     : "Replay event recorded",
             replayImpactLabel: (e.exitCode ?? 0) !== 0 || rawIsError(e)
-                ? "None, replay generated successfully"
+                ? "Replay generated; captured command failed"
                 : "Generated",
             capturedImpactLabel: (e.exitCode ?? 0) !== 0 || rawIsError(e)
                 ? "Failed command/test"
