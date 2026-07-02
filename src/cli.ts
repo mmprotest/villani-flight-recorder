@@ -25,10 +25,10 @@ program
       provider: o.provider,
       roots: o.root ? [o.root] : undefined,
     });
-    for (const s of sessions)
-      console.log(
-        `${s.provider}\n  path: ${s.path}\n  modified: ${new Date(s.mtimeMs).toISOString()}\n  size: ${s.size}\n  cwd: ${s.cwd ?? "unknown"}\n  session: ${s.sessionId ?? "unknown"}\n  model: ${s.model ?? "unknown"}\n  events: ${s.eventCount ?? "unknown"}\n  warnings: ${s.warnings.length}\n`,
-      );
+    console.log(`Provider: ${o.provider ?? "all"}`);
+    console.log(`Root: ${o.root ?? "default session roots"}`);
+    console.log(`Sessions found: ${sessions.length}`);
+    for (const s of sessions) console.log(s.path);
   });
 async function parse(provider: Provider, file: string) {
   if (provider === "claude") return parseClaudeSession(file);
@@ -59,7 +59,7 @@ program
       );
       if (!picked.candidate)
         throw new Error(
-          `No supported sessions found under ${o.root ?? "default session roots"}.`,
+          `No ${o.provider ?? "supported"} sessions found under ${o.root ?? "default session roots"}.`,
         );
       if (picked.uncertain)
         console.warn(
@@ -71,7 +71,16 @@ program
       redact: o.redact !== false,
       out: o.out,
     });
-    console.log(file);
+    if (o.latest) {
+      console.log(`Provider: ${session.provider}`);
+      console.log(`Root searched: ${o.root ?? "default session roots"}`);
+      console.log(
+        `Selected session: ${session.path ?? session.sessionPath ?? "unknown"}`,
+      );
+      console.log(`Replay written: ${file}`);
+    } else {
+      console.log(file);
+    }
     if (o.open) openBrowser(file);
   });
 program

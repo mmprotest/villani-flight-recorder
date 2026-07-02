@@ -44,9 +44,42 @@ describe("CLI replay output workflow", () => {
       "--out",
       dir,
     ]);
-    expect(stdout.trim()).toBe(path.join(dir, "index.html"));
+    expect(stdout).toContain("Provider: codex");
+    expect(stdout).toContain(`Root searched: ${fx("codex")}`);
+    expect(stdout).toContain("Selected session:");
+    expect(stdout).toContain(`Replay written: ${path.join(dir, "index.html")}`);
     expect(await fs.readFile(path.join(dir, "index.html"), "utf8")).toContain(
       "Codex",
     );
   }, 20000);
+
+  it("replay --latest --root strictly filters provider sessions", async () => {
+    await exec("npm", ["run", "build"]);
+    for (const provider of ["codex", "claude", "pi"] as const) {
+      const dir = await fs.mkdtemp(
+        path.join(os.tmpdir(), `vfr-latest-${provider}-`),
+      );
+      const { stdout } = await exec("node", [
+        "dist/cli.js",
+        "replay",
+        "--provider",
+        provider,
+        "--latest",
+        "--root",
+        fx(""),
+        "--out",
+        dir,
+      ]);
+      expect(stdout).toContain(`Provider: ${provider}`);
+      const selected =
+        stdout
+          .split("\n")
+          .find((line) => line.startsWith("Selected session:")) ?? "";
+      expect(selected).toContain(`${path.sep}${provider}${path.sep}`);
+      for (const other of ["codex", "claude", "pi"].filter(
+        (p) => p !== provider,
+      ))
+        expect(selected).not.toContain(`${path.sep}${other}${path.sep}`);
+    }
+  }, 30000);
 });

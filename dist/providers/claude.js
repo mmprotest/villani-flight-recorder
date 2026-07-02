@@ -4,7 +4,9 @@ import { blocks, contentText } from "./helpers/content.js";
 import { timestampOf } from "./helpers/timestamps.js";
 import { classifyTool } from "./helpers/tools.js";
 import { finish } from "./generic.js";
+import { assertProviderSession } from "./detect.js";
 export async function parseClaudeSession(sessionPath) {
+    await assertProviderSession("claude", sessionPath);
     const recs = await readJsonl(sessionPath);
     const events = [];
     const warnings = [];
