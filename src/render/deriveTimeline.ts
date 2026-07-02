@@ -235,7 +235,7 @@ export function deriveTimeline(
             : "Replay event recorded",
       replayImpactLabel:
         (e.exitCode ?? 0) !== 0 || rawIsError(e)
-          ? "Replay generated; captured command failed"
+          ? "The replay was generated successfully, but the captured agent command failed. Investigate this command before trusting the run outcome."
           : "Generated",
       capturedImpactLabel:
         (e.exitCode ?? 0) !== 0 || rawIsError(e)

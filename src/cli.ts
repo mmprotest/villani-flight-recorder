@@ -302,15 +302,27 @@ program
     }
     if (o.open) openBrowser(file);
   });
+async function assertGitRepo(repo: string) {
+  const stat = await fs.stat(repo).catch(() => null);
+  if (!stat?.isDirectory())
+    throw new Error(`git-replay --repo path is not a directory: ${repo}`);
+  const gitDir = await fs.stat(path.join(repo, ".git")).catch(() => null);
+  if (!gitDir)
+    throw new Error(`git-replay --repo path is not a git repository: ${repo}`);
+}
 program
   .command("git-replay")
   .requiredOption("--from <ref>")
   .requiredOption("--to <ref>")
+  .option("--repo <path>")
   .option("--open")
   .option("--out <path>")
   .option("--no-redact")
   .action(async (o) => {
-    const file = await renderReplay(await buildGitReplay(o.from, o.to), {
+    const repo = path.resolve(o.repo ?? process.cwd());
+    await assertGitRepo(repo);
+    const file = await renderReplay(await buildGitReplay(o.from, o.to, repo), {
+      cwd: repo,
       redact: o.redact !== false,
       out: o.out,
     });
