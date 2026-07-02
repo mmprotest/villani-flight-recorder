@@ -142,3 +142,56 @@ Git-only replay cannot know agent reasoning, uncommitted failed attempts, tool c
 ### Status model
 
 Villani Flight Recorder separates replay processing status from captured run status. A replay can be generated successfully even when the captured AI agent run failed tests or commands; the dashboard shows recorder output status and captured run outcome as separate concepts.
+
+## Launch flow: local session discovery and replay
+
+Villani Flight Recorder can index local agent telemetry and build replays without manually hunting for transcript files. All indexing data stays local. By default the JSON index is stored at `path.join(os.homedir(), ".villani-flight-recorder", "index.json")`; set `VFR_HOME=<path>` or pass `--index-dir <path>` to keep scans in another local directory.
+
+Provider session paths vary by tool and installation. Use `--root <path>` to scan fixture, custom, or team-specific telemetry locations. Discovery is conservative rather than perfect; if a manual transcript replay is uncertain, pass `--provider claude`, `--provider codex`, or `--provider pi`.
+
+```bash
+npm install
+npm test
+npm run build
+npm run typecheck
+
+node dist/cli.js scan --all
+node dist/cli.js sessions
+node dist/cli.js tasks
+node dist/cli.js replay --latest
+node dist/cli.js replay --session <session-id>
+node dist/cli.js replay --segment <segment-id>
+node dist/cli.js replay --repo <repo-path>
+node dist/cli.js open
+
+npm exec villani-flight-recorder -- scan --all
+npm link
+vfr scan --all
+npx villani-flight-recorder scan --all
+```
+
+Common launch commands:
+
+```bash
+vfr scan --all
+vfr scan --agent claude --root <path>
+vfr scan --agent codex --root <path>
+vfr scan --agent pi --root <path>
+vfr scan --agent generic --root <path>
+vfr sessions
+vfr tasks
+vfr replay --latest
+vfr replay --session <session-id>
+vfr replay --segment <segment-id>
+vfr replay --repo <repo-path>
+vfr open
+```
+
+Manual fallback remains available:
+
+```bash
+vfr replay --session path/to/session.jsonl --provider claude
+vfr git-replay --repo . --from HEAD~1 --to HEAD
+```
+
+`vfr scan` records source file paths, fingerprints, small titles/summaries derived from local content, inferred repos, and recorder warnings. It does not copy giant raw transcript bodies into the index or upload data.

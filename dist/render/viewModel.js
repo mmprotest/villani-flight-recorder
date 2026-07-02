@@ -3,7 +3,7 @@ import { deriveMetrics } from "./deriveMetrics.js";
 import { deriveTimeline } from "./deriveTimeline.js";
 import { deriveReplayStatus } from "./deriveReplayStatus.js";
 import { deriveCapturedRunStatus } from "./deriveCapturedRunStatus.js";
-import { changedFilesFromGit, diffFromGit } from "./deriveDetails.js";
+import { changedFilesFromEvents, changedFilesFromGit, diffFromEvents, diffFromGit, } from "./deriveDetails.js";
 export const fmtTime = (v) => {
     if (!v)
         return "—";
@@ -71,8 +71,13 @@ export function deriveReplayViewModel(session, git) {
         details: timeline[0]?.detail ?? { title: "No event" },
         warnings,
         rawEvents: events,
-        changedFiles: changedFilesFromGit(git),
-        diff: diffFromGit(git),
+        changedFiles: [
+            ...new Set([
+                ...changedFilesFromGit(git),
+                ...changedFilesFromEvents(events),
+            ]),
+        ],
+        diff: diffFromGit(git) || diffFromEvents(events) || "Not captured",
         provider: session.provider,
         redactionReport: session
             .redactionReport,
