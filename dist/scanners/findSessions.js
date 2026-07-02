@@ -63,14 +63,10 @@ export async function findSessions(opts = {}) {
                     warnings: parsed.warnings,
                 });
             }
-            catch (e) {
-                out.push({
-                    provider,
-                    path: f,
-                    mtimeMs: 0,
-                    size: 0,
-                    warnings: [e instanceof Error ? e.message : String(e)],
-                });
+            catch {
+                // Provider-specific scans are strict: files that cannot be confidently
+                // identified by the selected provider parser are omitted rather than
+                // reported with a misleading provider label.
             }
         }
     }

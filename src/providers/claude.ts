@@ -12,6 +12,7 @@ import { blocks, contentText } from "./helpers/content.js";
 import { timestampOf } from "./helpers/timestamps.js";
 import { classifyTool } from "./helpers/tools.js";
 import { finish } from "./generic.js";
+import { assertProviderSession } from "./detect.js";
 import { FlightEvent, FlightEventType, ParsedSession } from "./types.js";
 
 interface ClaudeToolUseMemory {
@@ -26,6 +27,7 @@ interface ClaudeToolUseMemory {
 export async function parseClaudeSession(
   sessionPath: string,
 ): Promise<ParsedSession> {
+  await assertProviderSession("claude", sessionPath);
   const recs = await readJsonl(sessionPath);
   const events: FlightEvent[] = [];
   const warnings: string[] = [];

@@ -10,11 +10,13 @@ import { readJsonl } from "../utils/jsonl.js";
 import { timestampOf } from "./helpers/timestamps.js";
 import { classifyTool } from "./helpers/tools.js";
 import { finish } from "./generic.js";
+import { assertProviderSession } from "./detect.js";
 import { FlightEvent, ParsedSession } from "./types.js";
 
 export async function parseCodexSession(
   sessionPath: string,
 ): Promise<ParsedSession> {
+  await assertProviderSession("codex", sessionPath);
   const recs = await readJsonl(sessionPath);
   const events: FlightEvent[] = [];
   const warnings: string[] = [];

@@ -160,6 +160,16 @@ h1 { margin: 0; font-size: clamp(20px, 3vw, 26px); }
 .warning-groups { display:grid; grid-template-columns: repeat(2,1fr); gap:14px; } .warning-groups h4 { margin:0 0 6px; font-size:11px; color:var(--text-muted); text-transform:uppercase; }
 .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .graph-node.lane-dimmed,.graph-link.lane-dimmed,.graph-lane-label.lane-dimmed { opacity:.48; } .graph-lane-label.lane-emphasis { color:rgba(184,213,255,.86); }
+.mobile-diagnostic-list { display:none; list-style:none; padding:0; margin:0 0 12px; }
+.mobile-diagnostic-list li { display:flex; justify-content:space-between; gap:10px; border:1px solid rgba(124,170,220,.12); border-radius:10px; padding:10px; margin-bottom:8px; background:rgba(8,19,31,.42); }
+.mobile-diagnostic-list b { color:var(--text-soft); font-size:12px; }
+.full-graph-label { color:var(--text-muted); font-size:12px; font-weight:700; margin:8px 0; }
+.evidence-block section { margin-top:10px; }
+.evidence-block h4 { margin:0 0 6px; color:var(--text-soft); font-size:12px; }
+.metadata-label { color:var(--text-dim); font-size:11px; font-weight:750; margin-bottom:5px; }
+.metadata-value { color:var(--text); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+@media (max-width: 700px) { .mobile-diagnostic-list { display:block; } .full-graph-label,.graph-scroll,.graph-legend { display:none; } .diagnostics-details[open] .graph-scroll { display:none; } }
+
 @media (max-width: 900px) { .app-shell{padding:14px; gap:14px;} .topbar{position:static; align-items:flex-start; flex-direction:column;} .run-summary{grid-template-columns:1fr; padding:18px;} .metadata-row{grid-template-columns:1fr 1fr;} .investigation-grid-main{grid-template-columns:1fr;} .detail-panel{min-height:320px;} .metadata-strip .meta-grid{grid-template-columns:1fr 1fr;} .graph-panel details:not([open]) .graph-scroll,.graph-panel details:not([open]) .graph-legend{display:none;} }
 @media (max-width: 520px) { .summary-facts,.metadata-row,.investigation-grid,.metadata-strip .meta-grid,.warning-groups{grid-template-columns:1fr;} .timeline-row{grid-template-columns:1fr;} .timeline-row time,.rail{display:none;} .timeline-row article{grid-template-columns:30px minmax(0,1fr);} .timeline-row em{display:none;} .panel{padding:14px;} .transport{width:100%; justify-content:center;} }
 `;

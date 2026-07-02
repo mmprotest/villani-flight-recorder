@@ -29,3 +29,27 @@ describe("scanner and hooks", () => {
     );
   });
 });
+
+const providers = ["codex", "claude", "pi"] as const;
+
+describe("strict provider scanning", () => {
+  for (const provider of providers) {
+    it(`scan --provider ${provider} only returns confident ${provider} sessions`, async () => {
+      const sessions = await findSessions({ roots: [fx("")], provider });
+      expect(sessions.length).toBeGreaterThan(0);
+      expect(sessions.every((s) => s.provider === provider)).toBe(true);
+      expect(
+        sessions.every((s) =>
+          s.path.includes(`${path.sep}${provider}${path.sep}`),
+        ),
+      ).toBe(true);
+      for (const other of providers.filter((p) => p !== provider)) {
+        expect(
+          sessions.some((s) =>
+            s.path.includes(`${path.sep}${other}${path.sep}`),
+          ),
+        ).toBe(false);
+      }
+    });
+  }
+});

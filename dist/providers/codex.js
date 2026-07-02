@@ -3,7 +3,9 @@ import { readJsonl } from "../utils/jsonl.js";
 import { timestampOf } from "./helpers/timestamps.js";
 import { classifyTool } from "./helpers/tools.js";
 import { finish } from "./generic.js";
+import { assertProviderSession } from "./detect.js";
 export async function parseCodexSession(sessionPath) {
+    await assertProviderSession("codex", sessionPath);
     const recs = await readJsonl(sessionPath);
     const events = [];
     const warnings = [];

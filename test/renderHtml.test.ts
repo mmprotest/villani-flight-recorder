@@ -105,6 +105,11 @@ describe("rendered HTML", () => {
     expect(html).not.toContain("N/A NO REPO");
     expect(html).toContain("@media (max-width: 900px)");
     expect(html).toContain("@media (max-width: 520px)");
+    expect(html).toContain("@media (max-width: 700px)");
+    expect(html).toContain("mobile-diagnostic-list");
+    expect(html).not.toContain(
+      "Captured agent-run evidence is prioritized below",
+    );
 
     const failed = [
       ...doc.querySelectorAll<HTMLElement>("[data-event-index]"),
@@ -127,6 +132,12 @@ describe("rendered HTML", () => {
       "Failed test command",
     );
     expect(doc.querySelector("#detailContent .metadata-strip")).toBeTruthy();
+    expect(
+      doc.querySelector("#detailContent .metadata-label")?.textContent,
+    ).toBeTruthy();
+    expect(
+      doc.querySelector("#detailContent .metadata-value")?.textContent,
+    ).toBeTruthy();
     const detailLayout = doc.querySelector(
       "#detailContent .detail-event-layout",
     );
