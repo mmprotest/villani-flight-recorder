@@ -13,6 +13,28 @@ Villani Flight Recorder is a black box recorder for AI coding agents. It turns l
 
 AI coding agents can make many local decisions quickly. This tool provides a local-first replay so a maintainer can investigate what happened without uploading transcripts or running a hosted dashboard.
 
+## Recommended workflow
+
+```sh
+npm install -g villani-flight-recorder
+vfr scan
+vfr browse
+```
+
+`vfr scan` indexes local Claude, Codex, and Pi sessions into a user-local index. `vfr browse` creates a local HTML session browser; click **Open Replay** in that page to inspect a run.
+
+Useful commands:
+
+```sh
+vfr scan --root ~/.claude
+vfr scan --root ~/.codex
+vfr scan --root ~/.pi
+vfr sessions
+vfr replay --id <session-id>
+```
+
+By default, the index is stored at `~/.villani-flight-recorder/index.json`. Browser output defaults to `~/.villani-flight-recorder/session-browser.html`, and replay files generated from indexed sessions are stored under `~/.villani-flight-recorder/replays/`.
+
 ## Local development and CLI usage
 
 Install dependencies, build the TypeScript output, and run the test suite from the repo root:
@@ -95,13 +117,13 @@ villani-flight-recorder install-hooks
 villani-flight-recorder hook <provider>
 ```
 
-`scan --root <path>` requires an explicit `--provider` so one file is not parsed as multiple providers.
+`scan --root <path>` supports explicit custom roots. Provider-specific matches are tried before the Generic JSONL fallback, so `scan --all` does not index the same provider transcript a second time as Generic.
 
 Default scan roots:
 
-- Claude: `~/.claude/projects`
-- Codex: `$CODEX_HOME/sessions` or `~/.codex/sessions`
-- Pi: `~/.pi/agent/sessions`
+- Claude: `~/.claude` and `~/.claude/projects`
+- Codex: `$CODEX_HOME/sessions`, `~/.codex`, and `~/.codex/sessions`
+- Pi: `~/.pi` and `~/.pi/agent/sessions`
 
 ## Privacy and redaction
 
@@ -134,7 +156,7 @@ Git-only replay cannot know agent reasoning, uncommitted failed attempts, tool c
 
 ## Troubleshooting
 
-- If `scan --root` fails, add `--provider claude`, `--provider codex`, or `--provider pi`.
+- If `scan --root` has too many results, add `--provider claude`, `--provider codex`, or `--provider pi` to restrict detection.
 - If a local transcript replay looks generic, re-run it with `--provider claude`, `--provider codex`, or `--provider pi`.
 - If Codex sessions are not found, check `CODEX_HOME`; the scanner does not rely on the path containing the word `codex`.
 - If a record is unknown, open the collapsed raw JSON in the replay and file an issue with a sanitized example.
@@ -157,9 +179,10 @@ npm run typecheck
 
 node dist/cli.js scan --all
 node dist/cli.js sessions
+node dist/cli.js browse
 node dist/cli.js tasks
 node dist/cli.js replay --latest
-node dist/cli.js replay --session <session-id>
+node dist/cli.js replay --id <session-id>
 node dist/cli.js replay --segment <segment-id>
 node dist/cli.js replay --repo <repo-path>
 node dist/cli.js open
@@ -178,9 +201,10 @@ vfr scan --provider claude --root <path>
 vfr scan --provider codex --root <path>
 vfr scan --provider pi --root <path>
 vfr sessions
+vfr browse
 vfr tasks
 vfr replay --latest
-vfr replay --session <session-id>
+vfr replay --id <session-id>
 vfr replay --segment <segment-id>
 vfr replay --repo <repo-path>
 vfr open

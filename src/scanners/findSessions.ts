@@ -22,9 +22,12 @@ export function defaultRoots(
     ? path.join(process.env.CODEX_HOME, "sessions")
     : expandHome("~/.codex/sessions");
   const roots = [
+    { provider: "claude" as const, root: expandHome("~/.claude") },
     { provider: "claude" as const, root: expandHome("~/.claude/projects") },
     { provider: "codex" as const, root: codexHome },
+    { provider: "codex" as const, root: expandHome("~/.codex") },
     { provider: "codex" as const, root: expandHome("~/.codex/sessions") },
+    { provider: "pi" as const, root: expandHome("~/.pi") },
     { provider: "pi" as const, root: expandHome("~/.pi/agent/sessions") },
   ];
   const seen = new Set<string>();
@@ -39,15 +42,14 @@ export function defaultRoots(
 export async function findSessions(
   opts: { provider?: Provider; roots?: string[]; cwd?: string } = {},
 ): Promise<SessionCandidate[]> {
-  if (opts.roots?.length && !real(opts.provider ?? "unknown"))
-    throw new Error(
-      "--root requires --provider claude, --provider codex, or --provider pi",
-    );
-  const roots =
-    opts.roots?.map((root) => ({
-      provider: opts.provider as keyof typeof parsers,
-      root: expandHome(root),
-    })) ?? defaultRoots(opts.provider);
+  const roots = opts.roots?.length
+    ? opts.roots.flatMap((root) =>
+        (real(opts.provider ?? "unknown")
+          ? [opts.provider as keyof typeof parsers]
+          : (["claude", "codex", "pi"] as const)
+        ).map((provider) => ({ provider, root: expandHome(root) })),
+      )
+    : defaultRoots(opts.provider);
   const out: SessionCandidate[] = [];
   for (const { provider, root } of roots) {
     try {

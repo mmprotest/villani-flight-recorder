@@ -16,9 +16,12 @@ export function defaultRoots(provider) {
         ? path.join(process.env.CODEX_HOME, "sessions")
         : expandHome("~/.codex/sessions");
     const roots = [
+        { provider: "claude", root: expandHome("~/.claude") },
         { provider: "claude", root: expandHome("~/.claude/projects") },
         { provider: "codex", root: codexHome },
+        { provider: "codex", root: expandHome("~/.codex") },
         { provider: "codex", root: expandHome("~/.codex/sessions") },
+        { provider: "pi", root: expandHome("~/.pi") },
         { provider: "pi", root: expandHome("~/.pi/agent/sessions") },
     ];
     const seen = new Set();
@@ -27,12 +30,11 @@ export function defaultRoots(provider) {
         seen.add(path.resolve(r.root)));
 }
 export async function findSessions(opts = {}) {
-    if (opts.roots?.length && !real(opts.provider ?? "unknown"))
-        throw new Error("--root requires --provider claude, --provider codex, or --provider pi");
-    const roots = opts.roots?.map((root) => ({
-        provider: opts.provider,
-        root: expandHome(root),
-    })) ?? defaultRoots(opts.provider);
+    const roots = opts.roots?.length
+        ? opts.roots.flatMap((root) => (real(opts.provider ?? "unknown")
+            ? [opts.provider]
+            : ["claude", "codex", "pi"]).map((provider) => ({ provider, root: expandHome(root) })))
+        : defaultRoots(opts.provider);
     const out = [];
     for (const { provider, root } of roots) {
         try {
