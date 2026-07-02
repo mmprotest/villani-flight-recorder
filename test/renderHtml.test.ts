@@ -49,9 +49,10 @@ describe("rendered HTML", () => {
     expect(html).toContain("Generated with warnings");
     expect(html).toContain("Failed: 1 failed test");
     expect(html).not.toContain("Failed, 1 failed tests");
-    expect(html).toContain("Recorder Pipeline");
-    expect(html).toContain("Captured Run");
-    expect(html).toContain("Repository");
+    expect(html).toContain("Recorder pipeline");
+    expect(html).toContain("Captured evidence");
+    expect(html).not.toContain("execution-graph-stage");
+    expect(html).not.toContain("graph-lane-label");
     expect(html).toContain("Design tokens");
     expect(html).toContain("Investigation report layout");
     expect(html).toContain("Replay coverage");
@@ -97,7 +98,7 @@ describe("rendered HTML", () => {
     expect(vm.changedFiles).not.toContain("dirty.txt");
   });
 
-  it("renders structured timeline, graph, detail tabs, and interactions", async () => {
+  it("renders structured timeline, coverage checklist, detail tabs, and interactions", async () => {
     const s = await parseClaudeSession(fx("claude/realistic-transcript.jsonl"));
     const html = await fs.readFile(
       await renderReplay(s, { cwd: process.cwd() }),
@@ -112,26 +113,25 @@ describe("rendered HTML", () => {
     expect(
       times.every((t) => !t.includes("T") && !/\d{4}-\d{2}-\d{2}/.test(t)),
     ).toBe(true);
-    expect(doc.querySelectorAll(".graph-node-title").length).toBeGreaterThan(0);
+    expect(doc.querySelectorAll(".coverage-title").length).toBeGreaterThan(0);
     expect(doc.querySelector(".run-summary h2")?.textContent).toMatch(
       /Failed|Succeeded|Warning|Not applicable/,
     );
-    expect(doc.querySelector(".graph-stage")).toBeTruthy();
-    expect(html).toContain("z-index: 1");
+    expect(doc.querySelector(".coverage-checklist")).toBeTruthy();
     expect(
-      [...doc.querySelectorAll(".graph-node-title")].some(
+      [...doc.querySelectorAll(".coverage-title")].some(
         (n) => n.textContent === "Commands",
       ),
     ).toBe(true);
     expect(
-      [...doc.querySelectorAll(".graph-node-subtitle")].some((n) =>
+      [...doc.querySelectorAll(".coverage-summary")].some((n) =>
         /Tools and tests|failed test|failed cmd|No commands|No command/.test(
           n.textContent ?? "",
         ),
       ),
     ).toBe(true);
     expect(
-      [...doc.querySelectorAll(".graph-node-title")].some(
+      [...doc.querySelectorAll(".coverage-title")].some(
         (n) => n.textContent === "Commands / Tools",
       ),
     ).toBe(false);
