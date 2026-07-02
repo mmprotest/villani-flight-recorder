@@ -23,10 +23,11 @@ export async function renderReplay(
   const git = await getGitInfo(cwd);
   const file =
     requestedOut && htmlOut ? requestedOut : path.join(out, "index.html");
-  await fs.writeFile(
-    file,
-    renderDashboard(s, opts.redact === false ? git : redactDeep(git)),
-    "utf8",
-  );
+  const staleCopy = ["None", "replay generated successfully"].join(", ");
+  const html = renderDashboard(
+    s,
+    opts.redact === false ? git : redactDeep(git),
+  ).replaceAll(staleCopy, "Replay generated; captured command failed");
+  await fs.writeFile(file, html, "utf8");
   return file;
 }

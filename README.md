@@ -35,7 +35,7 @@ npm exec -- villani-flight-recorder replay --session path/to/session.jsonl --pro
 You can also run the built entry point directly after `npm run build`:
 
 ```bash
-node dist/cli.js replay --session path/to/session.jsonl --provider generic
+node dist/cli.js replay --session path/to/session.jsonl --provider claude
 ```
 
 If you want `villani-flight-recorder` available as a shell command while working locally, link the package explicitly:
@@ -48,7 +48,7 @@ villani-flight-recorder replay --latest --provider claude
 If the package is available from npm in your environment, `npx` can run it without a local checkout:
 
 ```bash
-npx villani-flight-recorder replay --session path/to/session.jsonl --provider generic
+npx villani-flight-recorder replay --session path/to/session.jsonl --provider codex
 ```
 
 Minimal transcript replay example from this repo:
@@ -73,7 +73,7 @@ Example output path:
 
 ## Supported providers
 
-Provider parsers are defensive and best-effort. Unknown records are preserved in the replay instead of discarded.
+Provider parsers are defensive and best-effort. Unknown records are preserved in the replay instead of discarded. When reading a local transcript with `replay --session`, pass `--provider claude`, `--provider codex`, or `--provider pi` for the best provider-specific normalization; the CLI warns when a local transcript is replayed without an explicit provider.
 
 - Claude Code: content-array text blocks, `tool_use`, `tool_result`, Bash, Read, Edit, MultiEdit, Write, NotebookEdit, Grep, Glob, and hook payload records.
 - Codex: session metadata, user/assistant messages, shell tool calls/results, apply patches, approvals/permission records, MCP-like tool calls, hook payload records, and unknown rollout events.
@@ -89,7 +89,7 @@ villani-flight-recorder replay --latest --open
 villani-flight-recorder replay --provider claude --latest
 villani-flight-recorder replay --provider codex --latest
 villani-flight-recorder replay --provider pi --latest
-villani-flight-recorder replay --session <path-to-jsonl>
+villani-flight-recorder replay --session <path-to-jsonl> --provider <claude|codex|pi>
 villani-flight-recorder git-replay --from <ref> --to <ref>
 villani-flight-recorder install-hooks
 villani-flight-recorder hook <provider>
@@ -135,6 +135,7 @@ Git-only replay cannot know agent reasoning, uncommitted failed attempts, tool c
 ## Troubleshooting
 
 - If `scan --root` fails, add `--provider claude`, `--provider codex`, or `--provider pi`.
+- If a local transcript replay looks generic, re-run it with `--provider claude`, `--provider codex`, or `--provider pi`.
 - If Codex sessions are not found, check `CODEX_HOME`; the scanner does not rely on the path containing the word `codex`.
 - If a record is unknown, open the collapsed raw JSON in the replay and file an issue with a sanitized example.
 
