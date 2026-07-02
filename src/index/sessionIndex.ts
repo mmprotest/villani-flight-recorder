@@ -108,6 +108,12 @@ export async function scanToIndex(opts: {
   roots?: string[];
   limit?: number;
   indexDir?: string;
+  progress?: (event: {
+    stage: string;
+    message?: string;
+    current?: number;
+    total?: number;
+  }) => void;
 }) {
   const warnings: string[] = [];
   const sessions = [] as SessionIndex["sessions"];
@@ -115,6 +121,10 @@ export async function scanToIndex(opts: {
   const tasks = [] as SessionIndex["taskSegments"];
   const counts: Record<string, number> = {};
   const adapters = adaptersFor(opts.agent, opts.all);
+  opts.progress?.({
+    stage: "discover",
+    message: `Scanning ${opts.agent ?? "Claude/Codex/Pi"} session roots...`,
+  });
   for (const ad of adapters) counts[ad.label] = 0;
 
   const discoveredByPath = new Map<
@@ -148,6 +158,12 @@ export async function scanToIndex(opts: {
     ]),
   );
   const discovered = [...discoveredByPath.values()].slice(0, opts.limit);
+  opts.progress?.({
+    stage: "discover",
+    message: `Found ${discovered.length} candidate sessions.`,
+  });
+  opts.progress?.({ stage: "discover", message: "Parsing sessions..." });
+  let parsedCount = 0;
 
   for (const base of discovered) {
     let indexed = false;
@@ -261,7 +277,15 @@ export async function scanToIndex(opts: {
           );
       }
     }
+    parsedCount++;
+    if (parsedCount === discovered.length || parsedCount % 100 === 0)
+      opts.progress?.({
+        stage: "parse",
+        current: parsedCount,
+        total: discovered.length,
+      });
   }
+  opts.progress?.({ stage: "write-index", message: "Writing index..." });
   const index: SessionIndex = {
     version: 1,
     generatedAt: new Date().toISOString(),
@@ -271,5 +295,6 @@ export async function scanToIndex(opts: {
     warnings,
   };
   const indexPath = await writeIndex(index, opts.indexDir);
+  opts.progress?.({ stage: "write-index", message: "Scan complete." });
   return { index, indexPath, counts };
 }

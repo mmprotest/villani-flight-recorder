@@ -1,221 +1,143 @@
 # Villani Flight Recorder
 
-Villani Flight Recorder is a black box recorder for AI coding agents. It turns local Claude Code, Codex, Pi, and git activity into a static replay of what happened in your repo.
+Villani Flight Recorder turns local coding-agent transcripts into a searchable local session browser and static replay reports.
 
-## What it does
+## Quick start
 
-- Scans local provider session JSONL files.
-- Parses Claude Code, Codex, Pi, and git history into normalized events.
-- Generates a static, self-contained HTML investigation report in `.villani-flight-recorder/replays/`.
-- Shows prompts, assistant responses, tool calls, shell commands, file reads/edits, failed commands, warnings, unknown records, git state, and commit history where available.
-
-## Why it exists
-
-AI coding agents can make many local decisions quickly. This tool provides a local-first replay so a maintainer can investigate what happened without uploading transcripts or running a hosted dashboard.
-
-## Recommended workflow
-
-```sh
+```bash
 npm install -g villani-flight-recorder
+vfr launch
+```
+
+This scans local Claude/Codex/Pi session directories, builds a local index, generates the session browser, and opens it.
+
+## What it does locally
+
+Villani Flight Recorder reads local transcript/session files, indexes the sessions it can identify, generates cached static replay reports, and writes a static HTML session browser. It does not run a server for the browser.
+
+## View real local Claude/Codex/Pi sessions
+
+Use `launch` for the normal workflow:
+
+```bash
+vfr launch
+vfr launch --provider claude
+vfr launch --provider codex
+vfr launch --provider pi
+vfr launch --root <path>
+```
+
+Run `vfr launch` again after new sessions. Existing unchanged replay files are reused. Use `--rebuild` to regenerate all replay files.
+
+```bash
+vfr launch --rebuild
+vfr launch --no-open
+```
+
+## Manual flow
+
+If you prefer explicit steps:
+
+```bash
 vfr scan
 vfr browse
 vfr replay --id <session-id>
 ```
 
-`vfr scan` indexes local Claude, Codex, and Pi sessions into a user-local index. `vfr browse` creates a local static HTML session browser snapshot with search, filters, sorting, a filtered result count, a Clear filters reset, show-more pagination for large indexes, and a selected-session preview. `vfr replay --id <session-id>` opens the selected run as a local static HTML replay report.
+Common examples:
 
-Useful commands:
-
-```sh
-vfr scan --root ~/.claude
-vfr scan --root ~/.codex
-vfr scan --root ~/.pi
-vfr sessions
+```bash
+vfr scan --provider claude
+vfr sessions --provider claude --failed --limit 20
+vfr browse
 vfr replay --id <session-id>
 ```
 
-By default, the index is stored at `~/.villani-flight-recorder/index.json`. Browser output defaults to `~/.villani-flight-recorder/session-browser.html`, and replay files generated from indexed sessions are stored under `~/.villani-flight-recorder/replays/`. The session browser and replay report are local static HTML pages and do not require a server. The browser is generated from the local index at the time you run `vfr browse`; run `vfr scan` and `vfr browse` again to refresh stale rows and replay links. Open Replay links point to generated replay HTML for indexed sessions.
+## Browse sessions
 
-## Local development and CLI usage
-
-Install dependencies, build the TypeScript output, and run the test suite from the repo root:
+`vfr browse` reads the local index, prepares cached replay HTML files for indexed sessions, and writes the session browser.
 
 ```bash
-npm install
-npm run build
-npm test
-npm run typecheck
+vfr browse
+vfr browse --out ./sessions.html
 ```
 
-During local development, run the CLI through npm so it uses this checkout instead of assuming a global binary exists. The package exposes both `villani-flight-recorder` and the short `vfr` alias:
+The browser includes search, provider/outcome filters, sorting, Clear filters, Show more, a selected-session preview, and Open Replay links.
+
+## Open a replay
+
+From the session browser, click **Open Replay**. From the terminal, use an indexed session id:
 
 ```bash
-npm exec -- villani-flight-recorder scan --provider claude
-npm exec -- vfr replay --provider claude --latest
-npm exec -- villani-flight-recorder replay --session path/to/session.jsonl --provider codex
+vfr replay --id <session-id>
 ```
 
-You can also run the built entry point directly after `npm run build`:
+Replay pages opened from the browser include a Back to sessions link when the session browser location is known.
+
+## Direct transcript replay
+
+Use direct replay when you have a transcript file and do not need the session index:
 
 ```bash
-node dist/cli.js replay --session path/to/session.jsonl --provider claude
+vfr replay --session ./claude-session.jsonl --out ./replay.html
+vfr replay --session ./codex-rollout.jsonl --provider codex --out ./codex.html
 ```
 
-If you want `villani-flight-recorder` available as a shell command while working locally, link the package explicitly:
+## Git replay
+
+Generate a static report for a committed git range:
 
 ```bash
-npm link
-villani-flight-recorder replay --latest --provider claude
+vfr git-replay --repo ./my-repo --from HEAD~1 --to HEAD --out ./git-replay.html
 ```
 
-If the package is available from npm in your environment, `npx` can run it without a local checkout:
+Git replay reports the requested committed diff range and changed files.
 
-```bash
-npx villani-flight-recorder replay --session path/to/session.jsonl --provider codex
-```
+## Refresh and delta behavior
 
-Minimal transcript replay example from this repo:
+Run `vfr launch` again to pick up new or changed sessions. Existing unchanged replay files are reused. Use `--rebuild` to regenerate all replay files.
 
-```bash
-npm run build
-node dist/cli.js replay --session test/fixtures/claude/sample.jsonl --provider claude
-```
+`vfr browse --rebuild` also forces replay regeneration while keeping the manual scan/browse workflow.
 
-Minimal git replay example:
+## Where files are stored
 
-```bash
-npm run build
-node dist/cli.js git-replay --repo . --from HEAD~1 --to HEAD
-```
+By default, files are written under:
 
-Example output path:
+- Index: `~/.villani-flight-recorder/index.json`
+- Replay cache: `~/.villani-flight-recorder/replays/`
+- Replay cache manifest: `~/.villani-flight-recorder/replays/manifest.json`
+- Browser output: `~/.villani-flight-recorder/session-browser.html`
 
-```text
-.villani-flight-recorder/replays/<timestamp>-<provider>/index.html
-```
+Use `--index-dir <path>` to store the index and replay cache elsewhere. Use `--out <path>` to choose the browser or replay HTML output file.
 
-## Supported providers
+## Privacy and local data
 
-Provider parsers are defensive and best-effort. Unknown records are preserved in the replay instead of discarded. When reading a local transcript with `replay --session`, pass `--provider claude`, `--provider codex`, or `--provider pi` for the best provider-specific normalization; the CLI warns when a local transcript is replayed without an explicit provider.
-
-- Claude Code: content-array text blocks, `tool_use`, `tool_result`, Bash, Read, Edit, MultiEdit, Write, NotebookEdit, Grep, Glob, and hook payload records.
-- Codex: session metadata, user/assistant messages, shell tool calls/results, apply patches, approvals/permission records, MCP-like tool calls, hook payload records, and unknown rollout events.
-- Pi: session start/end, messages, tool calls, tool execution start/update/end, bash failures, branch summaries, model changes, compaction/summary unknowns, and unknown events.
-- Git: commit sequence, authors, timestamps, changed files, patches, final diff/stat, and deterministic change flags.
-
-## Commands
-
-```bash
-villani-flight-recorder scan
-villani-flight-recorder replay --latest
-villani-flight-recorder replay --latest --open
-villani-flight-recorder replay --provider claude --latest
-villani-flight-recorder replay --provider codex --latest
-villani-flight-recorder replay --provider pi --latest
-villani-flight-recorder replay --session <path-to-jsonl> --provider <claude|codex|pi>
-villani-flight-recorder git-replay --repo <repo-path> --from <ref> --to <ref>
-villani-flight-recorder install-hooks
-villani-flight-recorder hook <provider>
-```
-
-`scan --root <path>` supports explicit custom roots. Provider-specific matches are tried before the Generic JSONL fallback, so `scan --all` does not index the same provider transcript a second time as Generic.
-
-Default scan roots:
-
-- Claude: `~/.claude` and `~/.claude/projects`
-- Codex: `$CODEX_HOME/sessions`, `~/.codex`, and `~/.codex/sessions`
-- Pi: `~/.pi` and `~/.pi/agent/sessions`
-
-## Privacy and redaction
-
-Redaction is enabled by default and applies to messages, commands, stdout, stderr, diffs, raw JSON, warnings, and git data. Use `--no-redact` to disable it for local debugging only.
-
-The redactor covers common API keys, provider tokens, bearer tokens, GitHub tokens, Slack tokens, npm tokens, AWS/Google-looking keys, JWT-like values, private keys, env-style assignments, credentialed connection strings, and long high-entropy strings.
-
-## Hook installation behavior
-
-`install-hooks` currently writes documented snippets only. Manual installation is required. No Claude, Codex, or Pi config files are modified.
-
-Hook ingestion remains available:
-
-```bash
-cat payload.json | villani-flight-recorder hook claude
-```
-
-It writes JSONL into `.villani-flight-recorder/hooks/`, includes a received timestamp and provider, preserves the raw payload, and fails non-zero on invalid JSON.
-
-## Git-only replay limitations
-
-Git-only replay cannot know agent reasoning, uncommitted failed attempts, tool calls, approvals, or commands unless those details are present in commits. It does not re-execute commands and does not mutate the repository. Pass `--repo <path>` to replay a repository other than the current working directory; if omitted, the current directory is used.
-
-## Known limitations
-
-- Provider formats can change; unknown records are retained rather than discarded.
-- Hook installation is snippets-only until provider config formats can be safely modified.
-- Large stdout/stderr/diffs are truncated in the HTML view, while raw event context remains collapsed.
-- Replay selection prefers sessions whose cwd matches the current repo; if uncertain, it chooses the newest session and warns.
+Villani Flight Recorder reads local transcript files and writes local HTML files. It does not require a server for the session browser. Do not share generated HTML if it contains sensitive prompts, paths, commands, or diffs.
 
 ## Troubleshooting
 
-- If `scan --root` has too many results, add `--provider claude`, `--provider codex`, or `--provider pi` to restrict detection.
-- If a local transcript replay looks generic, re-run it with `--provider claude`, `--provider codex`, or `--provider pi`.
-- If Codex sessions are not found, check `CODEX_HOME`; the scanner does not rely on the path containing the word `codex`.
-- If a record is unknown, open the collapsed raw JSON in the replay and file an issue with a sanitized example.
+- If no sessions are found, run `vfr launch --provider claude`, `vfr launch --provider codex`, or `vfr launch --provider pi` to narrow discovery.
+- If your transcripts live somewhere custom, run `vfr launch --root <path>`.
+- If replay links look stale, run `vfr launch --rebuild`.
+- If you want terminal-only output, use `vfr scan`, `vfr sessions`, and `vfr replay --id <session-id>`.
+- For direct transcript parsing uncertainty, pass `--provider claude`, `--provider codex`, `--provider pi`, or `--provider generic`.
 
-### Status model
-
-Villani Flight Recorder separates replay processing status from captured run status. A replay can be generated successfully even when the captured AI agent run failed tests or commands; the dashboard shows recorder output status and captured run outcome as separate concepts.
-
-## Launch flow: local session discovery and replay
-
-Villani Flight Recorder can index local agent telemetry and build replays without manually hunting for transcript files. All indexing data stays local. By default the JSON index is stored at `path.join(os.homedir(), ".villani-flight-recorder", "index.json")`; set `VFR_HOME=<path>` or pass `--index-dir <path>` to keep scans in another local directory.
-
-Provider session paths vary by tool and installation. Use `--root <path>` to scan fixture, custom, or team-specific telemetry locations. Discovery is conservative rather than perfect; if a manual transcript replay is uncertain, pass `--provider claude`, `--provider codex`, or `--provider pi`.
+## Developer commands
 
 ```bash
 npm install
 npm test
 npm run build
 npm run typecheck
-
-node dist/cli.js scan --all
-node dist/cli.js sessions
-node dist/cli.js browse
-node dist/cli.js tasks
-node dist/cli.js replay --latest
-node dist/cli.js replay --id <session-id>
-node dist/cli.js replay --segment <segment-id>
-node dist/cli.js replay --repo <repo-path>
-node dist/cli.js open
-
-npm exec villani-flight-recorder -- scan --all
-npm link
-vfr scan --all
-npx villani-flight-recorder scan --all
+npm run format:check
+npm pack --dry-run
+npm exec -- vfr --version
 ```
 
-Common launch commands:
+Fixture workflow for local development:
 
 ```bash
-vfr scan --all
-vfr scan --provider claude --root <path>
-vfr scan --provider codex --root <path>
-vfr scan --provider pi --root <path>
-vfr sessions
-vfr browse
-vfr tasks
-vfr replay --latest
-vfr replay --id <session-id>
-vfr replay --segment <segment-id>
-vfr replay --repo <repo-path>
-vfr open
+rm -rf /tmp/vfr-dev-state /tmp/vfr-dev-out
+mkdir -p /tmp/vfr-dev-out
+npm exec -- vfr launch --root test/fixtures --index-dir /tmp/vfr-dev-state --out /tmp/vfr-dev-out/sessions.html --no-open
 ```
-
-Manual fallback remains available:
-
-```bash
-vfr replay --session path/to/session.jsonl --provider claude
-vfr git-replay --repo . --from HEAD~1 --to HEAD --out /tmp/vfr-git-demo.html
-```
-
-`vfr scan` records source file paths, fingerprints, small titles/summaries derived from local content, inferred repos, and recorder warnings. It does not copy giant raw transcript bodies into the index or upload data.

@@ -274,3 +274,24 @@ describe("session browser", () => {
     expect(html).toContain("Run vfr scan");
   });
 });
+
+it("renders robust session rows instead of the fragile column layout", () => {
+  const html = renderSessionBrowser(
+    idx([
+      {
+        ...base,
+        id: "robust",
+        provider: "claude",
+        providerLabel: "Claude",
+        outcome: "failed",
+        title: "Long title",
+      } as any,
+    ]),
+  );
+  expect(html).toContain("session-row-main");
+  expect(html).toContain("session-row-meta");
+  expect(html).toContain("session-row-action");
+  expect(html).toContain("session-row-title");
+  expect(html).toContain("session-row-source");
+  expect(html).toContain("overflow-wrap:anywhere");
+});
