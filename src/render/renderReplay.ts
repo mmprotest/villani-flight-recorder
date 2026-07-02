@@ -7,7 +7,13 @@ import { replayRoot, safeSegment } from "../utils/paths.js";
 import { redactDeep } from "../redaction/redact.js";
 export async function renderReplay(
   session: ParsedSession,
-  opts: { cwd?: string; redact?: boolean; out?: string } = {},
+  opts: {
+    cwd?: string;
+    redact?: boolean;
+    out?: string;
+    returnHref?: string;
+    returnLabel?: string;
+  } = {},
 ) {
   const cwd = opts.cwd ?? process.cwd();
   const defaultName = `${new Date().toISOString().replace(/[:.]/g, "-")}-${safeSegment(session.provider)}`;
@@ -26,6 +32,7 @@ export async function renderReplay(
   const html = renderDashboard(
     s,
     opts.redact === false ? git : redactDeep(git),
+    { returnHref: opts.returnHref, returnLabel: opts.returnLabel },
   );
   await fs.writeFile(file, html, "utf8");
   return file;

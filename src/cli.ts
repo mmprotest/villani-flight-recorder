@@ -24,6 +24,110 @@ program
     "Black box recorder for AI coding agents\n\nCommon workflow:\n  vfr scan\n  vfr browse\n  vfr replay --id <session-id>",
   )
   .version("0.1.0");
+
+const RENDERER_VERSION = "0.1.0-replay-checklist-v2";
+type ReplayManifestEntry = {
+  sessionId: string;
+  sourcePath: string;
+  sourceHash: string;
+  replayPath: string;
+  generatedAt: string;
+  rendererVersion: string;
+};
+type ReplayManifest = { version: number; entries: ReplayManifestEntry[] };
+async function readManifest(replayDir: string): Promise<ReplayManifest> {
+  try {
+    return JSON.parse(
+      await fs.readFile(path.join(replayDir, "manifest.json"), "utf8"),
+    );
+  } catch {
+    return { version: 1, entries: [] };
+  }
+}
+async function writeManifest(replayDir: string, manifest: ReplayManifest) {
+  await fs.writeFile(
+    path.join(replayDir, "manifest.json"),
+    JSON.stringify(manifest, null, 2),
+  );
+}
+async function prepareReplayCache(
+  idx: any,
+  opts: {
+    base: string;
+    out: string;
+    rebuild?: boolean;
+    progress?: (m: string) => void;
+  },
+) {
+  const replayDir = path.join(opts.base, "replays");
+  await fs.mkdir(replayDir, { recursive: true });
+  const manifest = await readManifest(replayDir);
+  const byId = new Map(manifest.entries.map((e) => [e.sessionId, e]));
+  let reused = 0,
+    generated = 0,
+    skipped = 0;
+  const next: ReplayManifestEntry[] = [];
+  const returnHref =
+    path.relative(replayDir, opts.out) || path.basename(opts.out);
+  opts.progress?.("Preparing replay cache...");
+  for (const s of idx.sessions) {
+    const replayPath = path.join(replayDir, `${s.id}.html`);
+    const old = byId.get(s.id);
+    const reusable =
+      !opts.rebuild &&
+      old &&
+      old.sourceHash === s.sourceHash &&
+      old.rendererVersion === RENDERER_VERSION &&
+      (await fs
+        .stat(replayPath)
+        .then(() => true)
+        .catch(() => false));
+    if (reusable) {
+      reused++;
+      next.push(old);
+      continue;
+    }
+    const ad = adaptersFor(String(s.provider))[0];
+    if (!ad) {
+      skipped++;
+      continue;
+    }
+    try {
+      const parsed = await ad.parse({
+        provider: s.provider,
+        sourcePath: s.sourcePath,
+        sourceKind: "file",
+        confidence: s.confidence,
+        reason: "browser replay",
+      });
+      await renderReplay(parsed as unknown as ParsedSession, {
+        out: replayPath,
+        returnHref,
+        returnLabel: "Back to sessions",
+      });
+      generated++;
+      next.push({
+        sessionId: s.id,
+        sourcePath: s.sourcePath,
+        sourceHash: s.sourceHash ?? "",
+        replayPath,
+        generatedAt: new Date().toISOString(),
+        rendererVersion: RENDERER_VERSION,
+      });
+    } catch {
+      skipped++;
+    }
+  }
+  await writeManifest(replayDir, { version: 1, entries: next });
+  return { replayDir, reused, generated, skipped };
+}
+function scanProgress(json?: boolean, quiet?: boolean) {
+  return json || quiet ? undefined : (m: string) => console.error(m);
+}
+async function openFile(file: string) {
+  openBrowser(file);
+}
+
 program
   .command("scan")
   .description(
@@ -43,13 +147,22 @@ program
   .option("--json")
   .option("--index-dir <path>")
   .option("--verbose")
+  .option("--quiet")
   .action(async (o) => {
+    const progress = scanProgress(o.json, o.quiet);
+    progress?.("Scanning local sessions...");
     const result = await scanToIndex({
       agent: o.agent ?? o.provider,
       all: o.all,
       roots: o.root?.length ? o.root : undefined,
       limit: o.limit ? Number(o.limit) : undefined,
       indexDir: o.indexDir,
+      progress: (e: any) => {
+        if (e.stage === "discover") progress?.(e.message);
+        else if (e.stage === "parse")
+          progress?.(`Parsed ${e.current} / ${e.total}`);
+        else if (e.stage === "write-index") progress?.(e.message);
+      },
     });
     const failedCommands = result.index.sessions.reduce(
       (n, s) => n + s.failedCommandCount,
@@ -196,37 +309,98 @@ program
   .option("--out <path>")
   .option("--index-dir <path>")
   .option("--open")
+  .option("--rebuild")
+  .option("--quiet")
   .action(async (o) => {
     const idx = await requireIndex(o.indexDir);
     if (!idx) return;
     const base = o.indexDir ?? defaultIndexDir();
     const out = o.out ?? path.join(base, "session-browser.html");
-    const replayDir = path.join(base, "replays");
-    await fs.mkdir(replayDir, { recursive: true });
-    for (const s of idx.sessions) {
-      const ad = adaptersFor(String(s.provider))[0];
-      if (!ad) continue;
-      try {
-        const parsed = await ad.parse({
-          provider: s.provider,
-          sourcePath: s.sourcePath,
-          sourceKind: "file",
-          confidence: s.confidence,
-          reason: "browser replay",
-        });
-        await renderReplay(parsed as unknown as ParsedSession, {
-          out: path.join(replayDir, `${s.id}.html`),
-        });
-      } catch {}
-    }
+    const progress = o.quiet ? undefined : (m: string) => console.error(m);
+    progress?.(`Reading index: ${idx.sessions.length} sessions.`);
+    const cache = await prepareReplayCache(idx, {
+      base,
+      out,
+      rebuild: o.rebuild,
+      progress,
+    });
+    progress?.(`Reused ${cache.reused} existing replays.`);
+    progress?.(`Generated ${cache.generated} changed replays.`);
+    progress?.(`Skipped ${cache.skipped} failed replay generations.`);
+    progress?.("Writing session browser...");
     await fs.mkdir(path.dirname(out), { recursive: true });
     await fs.writeFile(
       out,
-      renderSessionBrowser(idx, { replayDir, browserOut: out }),
+      renderSessionBrowser(idx, {
+        replayDir: cache.replayDir,
+        browserOut: out,
+      }),
     );
     console.log(`Session browser written to ${out}`);
     console.log("Open it in your browser.");
     if (o.open) openBrowser(out);
+  });
+
+program
+  .command("launch")
+  .description(
+    "Scan sessions, refresh replay cache, generate the session browser, and open it.",
+  )
+  .option("--provider <provider>")
+  .option("--agent <agent>")
+  .option("--all")
+  .option(
+    "--root <path>",
+    "session root",
+    (v, p: string[]) => [...(p ?? []), v],
+    [],
+  )
+  .option("--index-dir <path>")
+  .option("--out <path>")
+  .option("--no-open")
+  .option("--rebuild")
+  .action(async (o) => {
+    console.error("Villani Flight Recorder launch\n");
+    console.error("Scanning local sessions...");
+    const result = await scanToIndex({
+      agent: o.agent ?? o.provider,
+      all: o.all,
+      roots: o.root?.length ? o.root : undefined,
+      indexDir: o.indexDir,
+      progress: (e: any) => {
+        if (e.stage === "discover") console.error(e.message);
+        else if (e.stage === "parse")
+          console.error(`Parsed ${e.current} / ${e.total}`);
+        else if (e.stage === "write-index") console.error(e.message);
+      },
+    });
+    console.error(`Indexed ${result.index.sessions.length} sessions.`);
+    const base = o.indexDir ?? defaultIndexDir();
+    const out = o.out ?? path.join(base, "session-browser.html");
+    console.error("\nPreparing session browser...");
+    const cache = await prepareReplayCache(result.index, {
+      base,
+      out,
+      rebuild: o.rebuild,
+      progress: (m) => console.error(m),
+    });
+    console.error(`Reused ${cache.reused} replay files.`);
+    console.error(`Generated ${cache.generated} replay files.`);
+    if (cache.skipped)
+      console.error(`Skipped ${cache.skipped} failed replay generations.`);
+    await fs.mkdir(path.dirname(out), { recursive: true });
+    await fs.writeFile(
+      out,
+      renderSessionBrowser(result.index, {
+        replayDir: cache.replayDir,
+        browserOut: out,
+      }),
+    );
+    console.log(`Session browser written to ${out}`);
+    if (o.open) {
+      console.error("Opening browser...");
+      await openFile(out);
+    }
   });
 program
   .command("open")
@@ -369,6 +543,20 @@ program
               `${selectedSessionId}.html`,
             )
           : undefined),
+      returnHref: selectedSessionId
+        ? path.relative(
+            path.dirname(
+              o.out ??
+                path.join(
+                  o.indexDir ?? defaultIndexDir(),
+                  "replays",
+                  `${selectedSessionId}.html`,
+                ),
+            ),
+            path.join(o.indexDir ?? defaultIndexDir(), "session-browser.html"),
+          )
+        : undefined,
+      returnLabel: selectedSessionId ? "Back to sessions" : undefined,
     });
     if (o.latest) {
       console.log(`Provider: ${session.provider}`);

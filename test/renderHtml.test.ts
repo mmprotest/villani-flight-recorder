@@ -358,3 +358,19 @@ describe("timeline correlated command failures", () => {
     expect(doc.body.textContent).toContain("grouped_command_lifecycle");
   });
 });
+
+it("renders optional replay return navigation", async () => {
+  const s = await parseClaudeSession(
+    "test/fixtures/claude/realistic-transcript.jsonl",
+  );
+  const withBack = await renderReplay(s, {
+    cwd: process.cwd(),
+    returnHref: "../session-browser.html",
+    returnLabel: "Back to sessions",
+  });
+  expect(await fs.readFile(withBack, "utf8")).toContain("Back to sessions");
+  const withoutBack = await renderReplay(s, { cwd: process.cwd() });
+  expect(await fs.readFile(withoutBack, "utf8")).not.toContain(
+    'href="undefined"',
+  );
+});
