@@ -217,6 +217,41 @@ describe("session browser", () => {
     expect(doc.querySelectorAll(".session")).toHaveLength(100);
   });
 
+  it("uses dedicated layout fields for updated time and counts", () => {
+    const html = renderSessionBrowser(
+      idx([
+        {
+          ...base,
+          id: "long-layout",
+          provider: "claude",
+          providerLabel: "Claude",
+          outcome: "failed",
+          title:
+            "Investigate a very long replay title that should stay readable without pushing the timestamp into the event counts",
+          updatedAt: "2026-07-02T18:41:00.000Z",
+          eventCount: 123,
+          failedCommandCount: 4,
+          changedFileCount: 9,
+          failureSummary: "npm test failed with exit code 1",
+          projectPath:
+            "/tmp/a/very/long/source/path/that/should/truncate/safely/without/expanding/the/session/row",
+          sourcePath:
+            "/tmp/a/very/long/source/path/that/should/truncate/safely/without/crowding/events/session.jsonl",
+        },
+      ]),
+    );
+    expect(html).toContain("session-updated");
+    expect(html).toContain("session-events");
+    expect(html).toContain("session-failed");
+    expect(html).toContain("session-files");
+    expect(html).toContain("session-action");
+    expect(html).toContain("grid-template-columns:minmax(92px,112px)");
+    expect(html).toContain("minmax(158px,176px)");
+    expect(html).toContain("minmax(72px,84px)");
+    expect(html).toContain("session-project");
+    expect(html).toContain("session-source");
+  });
+
   it("does not render duplicated generic unknown titles", () => {
     const html = renderSessionBrowser(
       idx([
