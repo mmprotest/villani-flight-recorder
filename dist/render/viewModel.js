@@ -48,6 +48,13 @@ export function deriveReplayViewModel(session, git) {
     });
     const capturedRunStatus = deriveCapturedRunStatus(events);
     const timeline = deriveTimeline(events);
+    const eventFiles = changedFilesFromEvents(events);
+    const liveFiles = changedFilesFromGit(git);
+    const changedFiles = session.provider === "git" && eventFiles.length > 0
+        ? eventFiles
+        : [...new Set([...eventFiles, ...liveFiles])];
+    const eventDiff = diffFromEvents(events);
+    const liveDiff = diffFromGit(git);
     return {
         brand: { title: "Villani Flight Recorder", mode: "REPLAY" },
         topBar: {
@@ -71,13 +78,8 @@ export function deriveReplayViewModel(session, git) {
         details: timeline[0]?.detail ?? { title: "No event" },
         warnings,
         rawEvents: events,
-        changedFiles: [
-            ...new Set([
-                ...changedFilesFromGit(git),
-                ...changedFilesFromEvents(events),
-            ]),
-        ],
-        diff: diffFromGit(git) || diffFromEvents(events) || "Not captured",
+        changedFiles,
+        diff: eventDiff || liveDiff || "Not captured",
         provider: session.provider,
         redactionReport: session
             .redactionReport,

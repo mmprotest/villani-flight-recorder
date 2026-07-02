@@ -89,6 +89,8 @@ export function makeHumanEventTitle(e: FlightEvent): string {
   if (e.type === "error")
     return e.command ? `Command failed: ${e.command}` : "Error";
   if (e.type === "unknown")
-    return `Unknown ${e.provider[0].toUpperCase()}${e.provider.slice(1)} event`;
+    return ["generic", "unknown"].includes(String(e.provider))
+      ? "Generic replay"
+      : `Unknown ${e.provider[0].toUpperCase()}${e.provider.slice(1)} event`;
   return e.type.replaceAll("_", " ");
 }

@@ -9,6 +9,7 @@ import { parseCodexSession } from "../src/providers/codex.js";
 import { renderReplay } from "../src/render/renderReplay.js";
 import { safeJsonForScript } from "../src/render/safeHtml.js";
 import { deriveTimeline } from "../src/render/deriveTimeline.js";
+import { deriveReplayViewModel } from "../src/render/viewModel.js";
 const fx = (p: string) => path.resolve("test/fixtures", p);
 
 describe("rendered HTML", () => {
@@ -58,6 +59,42 @@ describe("rendered HTML", () => {
     expect(html).not.toMatch(/https?:\/\//);
     for (const match of html.matchAll(/<script>([\s\S]*?)<\/script>/g))
       expect(() => new vm.Script(match[1])).not.toThrow();
+  });
+
+  it("prefers event-derived git replay artifacts over dirty live git data", () => {
+    const eventDiff =
+      "diff --git a/README.md b/README.md\n+second\ndiff --git a/app.js b/app.js\n+console.log('hello')";
+    const liveDiff = "diff --git a/README.md b/README.md\n+third dirty line";
+    const vm = deriveReplayViewModel(
+      {
+        provider: "git",
+        path: "HEAD~1..HEAD",
+        sessionPath: "HEAD~1..HEAD",
+        events: [
+          {
+            id: "git-1",
+            provider: "git",
+            type: "diff",
+            title: "Final diff/stat",
+            diff: eventDiff,
+            raw: { files: "M README.md\nA app.js", diff: eventDiff },
+          },
+        ],
+        warnings: [],
+      },
+      {
+        root: "/tmp/repo",
+        branch: "main",
+        status: "M README.md\n?? dirty.txt",
+        diff: liveDiff,
+        diffStat: "",
+      },
+    );
+    expect(vm.diff).toBe(eventDiff);
+    expect(vm.diff).not.toContain("third dirty line");
+    expect(vm.changedFiles).toEqual(["README.md", "app.js"]);
+    expect(vm.changedFiles).not.toContain("M README.md");
+    expect(vm.changedFiles).not.toContain("dirty.txt");
   });
 
   it("renders structured timeline, graph, detail tabs, and interactions", async () => {

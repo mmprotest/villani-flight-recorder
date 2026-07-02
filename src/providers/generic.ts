@@ -71,7 +71,9 @@ export async function parseGeneric(
     );
     e.title =
       type === "unknown"
-        ? `Unknown ${provider[0].toUpperCase()}${provider.slice(1)} event: ${typeName}`
+        ? ["generic", "unknown"].includes(String(provider))
+          ? `Unknown event: ${typeName}`
+          : `Unknown ${provider[0].toUpperCase()}${provider.slice(1)} event: ${typeName}`
         : makeHumanEventTitle(e);
     events.push(e);
   }
