@@ -38,6 +38,16 @@ export async function parseGeneric(provider, sessionPath) {
             summary: textOf(o.message ?? o.content ?? o.summary ?? o.result),
             command,
             path,
+            exitCode: typeof o.exitCode === "number"
+                ? o.exitCode
+                : typeof o.exit_code === "number"
+                    ? o.exit_code
+                    : undefined,
+            durationMs: typeof o.durationMs === "number"
+                ? o.durationMs
+                : typeof o.duration_ms === "number"
+                    ? o.duration_ms
+                    : undefined,
             title: "",
         });
         e.title =

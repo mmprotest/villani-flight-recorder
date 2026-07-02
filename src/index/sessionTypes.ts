@@ -23,6 +23,7 @@ export type SessionRecord = {
   changedFiles?: string[];
   model?: string;
   durationMs?: number;
+  failureSummary?: string;
   tokenCount?: number;
   costUsd?: number;
   sourceHash?: string;

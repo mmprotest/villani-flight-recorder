@@ -10,9 +10,56 @@ import { writeIndex } from "./sessionStore.js";
 const exec = promisify(execFile);
 const hash = (s) => createHash("sha1").update(s).digest("hex").slice(0, 12);
 const repoId = (r) => "vfr_repo_" + hash(path.resolve(r));
-const titleFrom = (events) => events.find((e) => e.type === "user_message")?.summary ||
-    events.find((e) => e.summary)?.summary ||
-    events[0]?.title;
+function cleanText(v) {
+    const t = (v ?? "").replace(/\s+/g, " ").trim();
+    if (!t || /^(unknown|generic|claude|codex|pi)$/i.test(t))
+        return undefined;
+    return t.length > 120 ? `${t.slice(0, 117)}…` : t;
+}
+const titleFrom = (events) => {
+    const firstPrompt = cleanText(events.find((e) => e.type === "user_message")?.summary);
+    if (firstPrompt)
+        return firstPrompt;
+    const meaningful = events.find((e) => cleanText(e.summary))?.summary;
+    if (cleanText(meaningful))
+        return cleanText(meaningful);
+    const first = events[0];
+    if (first?.type === "unknown")
+        return `Unknown event: ${first.raw && typeof first.raw === "object" && "type" in first.raw ? String(first.raw.type) : "unrecognized record"}`;
+    return cleanText(first?.title) ?? "Untitled session";
+};
+function failureSummary(events) {
+    const failed = events.filter((e) => (e.command && (e.exitCode ?? 0) !== 0) || e.type === "error");
+    const first = failed.find((e) => e.command);
+    if (first?.command) {
+        const code = first.exitCode ?? 1;
+        return `${first.command} failed with exit code ${code}`;
+    }
+    return failed.length
+        ? `${failed.length} failed command${failed.length === 1 ? "" : "s"}`
+        : undefined;
+}
+function durationMs(events, startedAt, endedAt) {
+    const direct = events
+        .map((e) => e.durationMs)
+        .filter((n) => typeof n === "number");
+    if (direct.length)
+        return direct.reduce((a, b) => a + b, 0);
+    if (startedAt && endedAt) {
+        const ms = Date.parse(endedAt) - Date.parse(startedAt);
+        if (Number.isFinite(ms) && ms >= 0)
+            return ms;
+    }
+    return undefined;
+}
+function changedEventFiles(events) {
+    return [
+        ...new Set(events
+            .filter((e) => ["file_write", "file_edit", "file_delete", "diff"].includes(e.type))
+            .map((e) => e.path)
+            .filter(Boolean)),
+    ];
+}
 async function fp(file) {
     const st = await fs.stat(file);
     const buf = await fs.readFile(file);
@@ -124,9 +171,7 @@ export async function scanToIndex(opts) {
                     }
                 }
                 const failedCommandCount = parsed.events.filter((e) => (e.exitCode ?? 0) !== 0 || e.type === "error").length;
-                const changedFiles = [
-                    ...new Set(parsed.events.map((e) => e.path).filter(Boolean)),
-                ];
+                const changedFiles = changedEventFiles(parsed.events);
                 const firstEventAt = parsed.startedAt ?? parsed.events.find((e) => e.timestamp)?.timestamp;
                 const lastEventAt = parsed.endedAt ??
                     [...parsed.events].reverse().find((e) => e.timestamp)?.timestamp;
@@ -155,6 +200,8 @@ export async function scanToIndex(opts) {
                     changedFileCount: changedFiles.length,
                     changedFiles,
                     model: parsed.model,
+                    durationMs: durationMs(parsed.events, firstEventAt, lastEventAt),
+                    failureSummary: failureSummary(parsed.events),
                     sourceHash: fingerprint.hash,
                     sourceSize: fingerprint.sizeBytes,
                     sourceMtimeMs: new Date(fingerprint.modifiedAt).getTime(),
