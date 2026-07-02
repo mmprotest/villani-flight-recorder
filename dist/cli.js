@@ -111,6 +111,7 @@ program
     .option("--index-dir <path>")
     .option("--verbose")
     .option("--quiet")
+    .option("--rebuild")
     .action(async (o) => {
     const progress = scanProgress(o.json, o.quiet);
     progress?.("Scanning local sessions...");
@@ -120,11 +121,18 @@ program
         roots: o.root?.length ? o.root : undefined,
         limit: o.limit ? Number(o.limit) : undefined,
         indexDir: o.indexDir,
+        rebuild: o.rebuild,
         progress: (e) => {
             if (e.stage === "discover")
                 progress?.(e.message);
-            else if (e.stage === "parse")
-                progress?.(`Parsed ${e.current} / ${e.total}`);
+            else if (e.stage === "metadata-check" || e.stage === "summary")
+                progress?.(e.message);
+            else if (e.stage === "parse") {
+                if (e.message)
+                    progress?.(e.message);
+                else
+                    progress?.(`Parsed ${e.current} / ${e.total}`);
+            }
             else if (e.stage === "write-index")
                 progress?.(e.message);
         },
@@ -268,8 +276,8 @@ program
         rebuild: o.rebuild,
         progress,
     });
-    progress?.(`Reused ${cache.reused} existing replays.`);
-    progress?.(`Generated ${cache.generated} changed replays.`);
+    progress?.(`Reused ${cache.reused} replay files.`);
+    progress?.(`Generated ${cache.generated} replay files.`);
     progress?.(`Skipped ${cache.skipped} failed replay generations.`);
     progress?.("Writing session browser...");
     await fs.mkdir(path.dirname(out), { recursive: true });
@@ -301,15 +309,24 @@ program
         all: o.all,
         roots: o.root?.length ? o.root : undefined,
         indexDir: o.indexDir,
+        rebuild: o.rebuild,
         progress: (e) => {
             if (e.stage === "discover")
                 console.error(e.message);
-            else if (e.stage === "parse")
-                console.error(`Parsed ${e.current} / ${e.total}`);
+            else if (e.stage === "metadata-check" || e.stage === "summary")
+                console.error(e.message);
+            else if (e.stage === "parse") {
+                if (e.message)
+                    console.error(e.message);
+                else
+                    console.error(`Parsed ${e.current} / ${e.total}`);
+            }
             else if (e.stage === "write-index")
                 console.error(e.message);
         },
     });
+    console.error(`Skipped ${result.skippedUnchanged} unchanged sessions.`);
+    console.error(`Parsed ${result.parsedNew + result.parsedChanged} new or changed sessions.`);
     console.error(`Indexed ${result.index.sessions.length} sessions.`);
     const base = o.indexDir ?? defaultIndexDir();
     const out = o.out ?? path.join(base, "session-browser.html");

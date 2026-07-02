@@ -76,6 +76,7 @@ async function fp(file: string) {
   return {
     sizeBytes: st.size,
     modifiedAt: st.mtime.toISOString(),
+    mtimeMs: st.mtimeMs,
     hash: hash(buf.toString("utf8")),
   };
 }
@@ -108,11 +109,16 @@ export async function scanToIndex(opts: {
   roots?: string[];
   limit?: number;
   indexDir?: string;
+  rebuild?: boolean;
   progress?: (event: {
     stage: string;
     message?: string;
     current?: number;
     total?: number;
+    skipped?: number;
+    parsedNew?: number;
+    parsedChanged?: number;
+    removed?: number;
   }) => void;
 }) {
   const warnings: string[] = [];
@@ -157,15 +163,73 @@ export async function scanToIndex(opts: {
       s,
     ]),
   );
+  const previousBySourcePath = new Map(
+    previous?.sessions.map((s) => [path.resolve(s.sourcePath), s]),
+  );
   const discovered = [...discoveredByPath.values()].slice(0, opts.limit);
   opts.progress?.({
     stage: "discover",
     message: `Found ${discovered.length} candidate sessions.`,
   });
-  opts.progress?.({ stage: "discover", message: "Parsing sessions..." });
+  opts.progress?.({
+    stage: "discover",
+    message: `Loaded existing index: ${previous?.sessions.length ?? 0} sessions.`,
+  });
+  opts.progress?.({
+    stage: "metadata-check",
+    message: "Checking file metadata...",
+  });
+  let skippedUnchanged = 0;
+  let parsedNew = 0;
+  let parsedChanged = 0;
+  const discoveredKeys = new Set<string>();
+  const toParse: typeof discovered = [];
+  const reusedIds = new Set<string>();
+  for (const base of discovered) {
+    const abs = path.resolve(base.sourcePath);
+    const key = `${base.provider}:${abs}`;
+    discoveredKeys.add(key);
+    const prev = previousByPath.get(key) ?? previousBySourcePath.get(abs);
+    const st = await fs.stat(abs).catch(() => undefined);
+    const unchanged =
+      !opts.rebuild &&
+      prev &&
+      st &&
+      prev.sourceSize === st.size &&
+      Math.abs((prev.sourceMtimeMs ?? 0) - st.mtimeMs) < 1;
+    if (unchanged) {
+      sessions.push({ ...prev, sourcePath: abs });
+      reusedIds.add(prev.id);
+      counts[prev.providerLabel] = (counts[prev.providerLabel] ?? 0) + 1;
+      skippedUnchanged++;
+    } else {
+      toParse.push({ ...base, sourcePath: abs });
+      if (prev) parsedChanged++;
+      else parsedNew++;
+    }
+  }
+  const removed = previous
+    ? previous.sessions.filter(
+        (s) => !discoveredByPath.has(path.resolve(s.sourcePath)),
+      ).length
+    : 0;
+  opts.progress?.({
+    stage: "metadata-check",
+    message: `Skipped ${skippedUnchanged} unchanged sessions.`,
+    skipped: skippedUnchanged,
+    parsedNew,
+    parsedChanged,
+    removed,
+  });
+  opts.progress?.({
+    stage: "parse",
+    message: `Parsing ${toParse.length} new or changed sessions...`,
+    current: 0,
+    total: toParse.length,
+  });
   let parsedCount = 0;
 
-  for (const base of discovered) {
+  for (const base of toParse) {
     let indexed = false;
     const tryAdapters = opts.agent ? adapters : adaptersFor(undefined, true);
     for (const ad of tryAdapters) {
@@ -251,7 +315,7 @@ export async function scanToIndex(opts: {
           failureSummary: failureSummary(parsed.events),
           sourceHash: fingerprint.hash,
           sourceSize: fingerprint.sizeBytes,
-          sourceMtimeMs: new Date(fingerprint.modifiedAt).getTime(),
+          sourceMtimeMs: fingerprint.mtimeMs,
           firstEventAt,
           lastEventAt,
           eventCount: parsed.events.length,
@@ -278,13 +342,32 @@ export async function scanToIndex(opts: {
       }
     }
     parsedCount++;
-    if (parsedCount === discovered.length || parsedCount % 100 === 0)
+    if (parsedCount === toParse.length || parsedCount % 100 === 0)
       opts.progress?.({
         stage: "parse",
         current: parsedCount,
-        total: discovered.length,
+        total: toParse.length,
       });
   }
+  if (previous && reusedIds.size) {
+    for (const t of previous.taskSegments)
+      if (reusedIds.has(t.sessionId)) tasks.push(t);
+    for (const r of previous.repos) {
+      const sessionIds = r.sessionIds.filter(
+        (id) => reusedIds.has(id) || sessions.some((s) => s.id === id),
+      );
+      if (sessionIds.length && !repos.has(r.id))
+        repos.set(r.id, { ...r, sessionIds });
+    }
+  }
+  opts.progress?.({
+    stage: "summary",
+    message: `Parsed ${parsedNew} new sessions. Parsed ${parsedChanged} changed sessions. Removed or missing sessions: ${removed}.`,
+    skipped: skippedUnchanged,
+    parsedNew,
+    parsedChanged,
+    removed,
+  });
   opts.progress?.({ stage: "write-index", message: "Writing index..." });
   const index: SessionIndex = {
     version: 1,
@@ -296,5 +379,13 @@ export async function scanToIndex(opts: {
   };
   const indexPath = await writeIndex(index, opts.indexDir);
   opts.progress?.({ stage: "write-index", message: "Scan complete." });
-  return { index, indexPath, counts };
+  return {
+    index,
+    indexPath,
+    counts,
+    skippedUnchanged,
+    parsedNew,
+    parsedChanged,
+    removed,
+  };
 }

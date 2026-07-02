@@ -12,11 +12,32 @@ const fx = (p: string) => path.join(process.cwd(), "test/fixtures", p);
 describe("session index flow", () => {
   it("does not duplicate stable sessions across rescans", async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "vfr-index-"));
-    await scanToIndex({ all: true, roots: [fx("claude")], indexDir: dir });
+    const firstResult = await scanToIndex({
+      all: true,
+      roots: [fx("claude")],
+      indexDir: dir,
+    });
     const first = (await readIndex(dir))!.sessions.length;
-    await scanToIndex({ all: true, roots: [fx("claude")], indexDir: dir });
+    expect(firstResult.parsedNew).toBe(first);
+
+    const secondResult = await scanToIndex({
+      all: true,
+      roots: [fx("claude")],
+      indexDir: dir,
+    });
     const second = (await readIndex(dir))!.sessions.length;
     expect(second).toBe(first);
+    expect(secondResult.skippedUnchanged).toBe(first);
+    expect(secondResult.parsedNew + secondResult.parsedChanged).toBe(0);
+
+    const rebuildResult = await scanToIndex({
+      all: true,
+      roots: [fx("claude")],
+      indexDir: dir,
+      rebuild: true,
+    });
+    expect(rebuildResult.skippedUnchanged).toBe(0);
+    expect(rebuildResult.parsedChanged).toBe(first);
   });
   it("uses generic only as fallback during --all scans", async () => {
     const dir = await fs.mkdtemp(path.join(os.tmpdir(), "vfr-fallback-"));

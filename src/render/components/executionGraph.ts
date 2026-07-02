@@ -30,7 +30,7 @@ const mark = (c: string) =>
         : "✓";
 const row = (n: GraphNodeViewModel, i = 0) => {
   const c = cls(n);
-  return `<li class="coverage-row graph-node ${c}" data-graph-index="${i}"><span class="coverage-icon">${mark(c)}</span><span><span class="coverage-title graph-node-title">${escapeHtml(n.title)}</span><span class="coverage-summary graph-node-subtitle">${escapeHtml(n.subtitle ?? "Coverage stage captured")}</span></span><b class="coverage-pill">${escapeHtml(badge(n))}</b></li>`;
+  return `<li class="coverage-row ${c}" data-graph-index="${i}"><span class="coverage-icon">${mark(c)}</span><span><span class="coverage-title">${escapeHtml(n.title)}</span><span class="coverage-summary">${escapeHtml(n.subtitle ?? "Coverage stage captured")}</span></span><b class="coverage-pill">${escapeHtml(badge(n))}</b></li>`;
 };
 export const executionGraph = (vm: ReplayDashboardViewModel) => {
   const hasIssue =
@@ -45,5 +45,5 @@ export const executionGraph = (vm: ReplayDashboardViewModel) => {
     ["source", "parse", "normalize", "replay"].some((id) => n.id.includes(id)),
   );
   const evidence = vm.graph.nodes.filter((n) => !pipeline.includes(n));
-  return `<section class="panel graph-panel"><details class="diagnostics-details${hasIssue ? " has-issue" : ""}"><summary>${hasIssue ? `Replay generated with ${vm.warnings.length || 1} recorder warning${(vm.warnings.length || 1) === 1 ? "" : "s"}. ` : ""}View replay coverage</summary><div class="panel-head"><div><h2>Replay coverage</h2><p>Compact checklist of parser, normalization, command/file evidence, git state, and replay output.</p></div></div><div class="coverage-checklist graph-stage"><span class="sr-only">Captured Run</span><span class="sr-only">Repository</span><section class="coverage-group"><h3>Recorder Pipeline</h3><ul>${(pipeline.length ? pipeline : vm.graph.nodes.slice(0, 4)).map(row).join("")}</ul></section><section class="coverage-group"><h3>Captured evidence</h3><ul>${(evidence.length ? evidence : vm.graph.nodes.slice(4)).map((n, i) => row(n, i + (pipeline.length ? pipeline.length : 4))).join("")}</ul></section></div></details></section>`;
+  return `<section class="panel graph-panel"><details class="diagnostics-details${hasIssue ? " has-issue" : ""}"><summary>${hasIssue ? `Replay generated with ${vm.warnings.length || 1} recorder warning${(vm.warnings.length || 1) === 1 ? "" : "s"}. ` : ""}View replay coverage</summary><div class="panel-head"><div><h2>Replay coverage</h2><p>Compact checklist of parser, normalization, command/file evidence, git state, and replay output.</p></div></div><div class="coverage-checklist"><section class="coverage-group"><h3>Recorder pipeline</h3><ul>${(pipeline.length ? pipeline : vm.graph.nodes.slice(0, 4)).map(row).join("")}</ul></section><section class="coverage-group"><h3>Captured evidence</h3><ul>${(evidence.length ? evidence : vm.graph.nodes.slice(4)).map((n, i) => row(n, i + (pipeline.length ? pipeline.length : 4))).join("")}</ul></section></div></details></section>`;
 };
