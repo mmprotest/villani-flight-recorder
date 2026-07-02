@@ -13,14 +13,56 @@ Villani Flight Recorder is a black box recorder for AI coding agents. It turns l
 
 AI coding agents can make many local decisions quickly. This tool provides a local-first replay so a maintainer can investigate what happened without uploading transcripts or running a hosted dashboard.
 
-## Quick start
+## Local development and CLI usage
+
+Install dependencies, build the TypeScript output, and run the test suite from the repo root:
 
 ```bash
 npm install
 npm run build
-villani-flight-recorder scan --provider claude
-villani-flight-recorder replay --provider claude --latest
-villani-flight-recorder replay --session path/to/session.jsonl --provider codex
+npm test
+npm run typecheck
+```
+
+During local development, run the CLI through npm so it uses this checkout instead of assuming a global binary exists:
+
+```bash
+npm exec -- villani-flight-recorder scan --provider claude
+npm exec -- villani-flight-recorder replay --provider claude --latest
+npm exec -- villani-flight-recorder replay --session path/to/session.jsonl --provider codex
+```
+
+You can also run the built entry point directly after `npm run build`:
+
+```bash
+node dist/cli.js replay --session path/to/session.jsonl --provider generic
+```
+
+If you want `villani-flight-recorder` available as a shell command while working locally, link the package explicitly:
+
+```bash
+npm link
+villani-flight-recorder replay --latest --provider claude
+```
+
+If the package is available from npm in your environment, `npx` can run it without a local checkout:
+
+```bash
+npx villani-flight-recorder replay --session path/to/session.jsonl --provider generic
+```
+
+Minimal transcript replay example from this repo:
+
+```bash
+npm run build
+node dist/cli.js replay --session test/fixtures/claude/sample.jsonl --provider claude
+```
+
+Minimal git replay example:
+
+```bash
+npm run build
+node dist/cli.js git-replay --from HEAD~1 --to HEAD
 ```
 
 Example output path:
