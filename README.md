@@ -22,7 +22,7 @@ vfr browse
 vfr replay --id <session-id>
 ```
 
-`vfr scan` indexes local Claude, Codex, and Pi sessions into a user-local index. `vfr browse` creates a local static HTML session browser with search, filters, sorting, a filtered result count, and a selected-session preview. `vfr replay --id <session-id>` opens the selected run as a local static HTML replay report.
+`vfr scan` indexes local Claude, Codex, and Pi sessions into a user-local index. `vfr browse` creates a local static HTML session browser snapshot with search, filters, sorting, a filtered result count, a Clear filters reset, show-more pagination for large indexes, and a selected-session preview. `vfr replay --id <session-id>` opens the selected run as a local static HTML replay report.
 
 Useful commands:
 
@@ -34,7 +34,7 @@ vfr sessions
 vfr replay --id <session-id>
 ```
 
-By default, the index is stored at `~/.villani-flight-recorder/index.json`. Browser output defaults to `~/.villani-flight-recorder/session-browser.html`, and replay files generated from indexed sessions are stored under `~/.villani-flight-recorder/replays/`. The session browser and replay report are local static HTML pages and do not require a server.
+By default, the index is stored at `~/.villani-flight-recorder/index.json`. Browser output defaults to `~/.villani-flight-recorder/session-browser.html`, and replay files generated from indexed sessions are stored under `~/.villani-flight-recorder/replays/`. The session browser and replay report are local static HTML pages and do not require a server. The browser is generated from the local index at the time you run `vfr browse`; run `vfr scan` and `vfr browse` again to refresh stale rows and replay links. Open Replay links point to generated replay HTML for indexed sessions.
 
 ## Local development and CLI usage
 

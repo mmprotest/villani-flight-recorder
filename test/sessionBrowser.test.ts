@@ -1,3 +1,4 @@
+import { JSDOM } from "jsdom";
 import { describe, expect, it } from "vitest";
 import { renderSessionBrowser } from "../src/render/sessionBrowser.js";
 import { SessionIndex } from "../src/index/sessionTypes.js";
@@ -122,7 +123,7 @@ describe("session browser", () => {
     expect(html).toContain("outcome-pill");
   });
 
-  it("includes safe selected-preview data, filtered count, empty filtered state, and sort", () => {
+  it("includes clear filters, active summary, freshness, pagination, and empty-state copy", () => {
     const html = renderSessionBrowser(
       idx([
         {
@@ -152,11 +153,68 @@ describe("session browser", () => {
     expect(html).toContain("Showing ");
     expect(html).toContain(" of ");
     expect(html).toContain(" sessions");
+    expect(html).toContain("Clear filters");
+    expect(html).toContain('id="activeFilterSummary"');
+    expect(html).toContain("No filters active");
     expect(html).toContain("No sessions match the current filters.");
+    expect(html).toContain("Clear filters to show all indexed sessions.");
+    expect(html).toContain("Show more");
+    expect(html).toContain("matching sessions");
+    expect(html).toContain(
+      "Open Replay links point to replay HTML generated for this browser snapshot",
+    );
+    expect(html).toContain("Replay generated for this browser snapshot");
     expect(html).toContain("Updated newest first");
     expect(html).toContain("Failed commands");
     expect(html).toContain("src/safe.ts");
     expect(html).not.toContain('<img src=x onerror="alert(1)">');
+  });
+
+  it("resets filters and pagination in the browser script", async () => {
+    const sessions = Array.from({ length: 105 }, (_, i) => ({
+      ...base,
+      id: `s${i}`,
+      provider: i === 104 ? ("codex" as const) : ("claude" as const),
+      providerLabel: i === 104 ? "Codex" : "Claude",
+      outcome: i === 104 ? ("failed" as const) : ("success" as const),
+      title: `Run ${i}`,
+      updatedAt: `2026-01-${String((i % 28) + 1).padStart(2, "0")}T00:00:00.000Z`,
+    }));
+    const dom = new JSDOM(renderSessionBrowser(idx(sessions)), {
+      runScripts: "dangerously",
+      url: "file:///tmp/sessions.html",
+    });
+    const doc = dom.window.document;
+    expect(doc.querySelectorAll(".session")).toHaveLength(100);
+    expect(doc.getElementById("resultCount")?.textContent).toContain(
+      "Showing 100 of 105 matching sessions · 105 indexed",
+    );
+    doc
+      .getElementById("showMore")
+      ?.dispatchEvent(new dom.window.Event("click"));
+    expect(doc.querySelectorAll(".session")).toHaveLength(105);
+    (doc.getElementById("search") as HTMLInputElement).value = "no-match";
+    doc.getElementById("search")?.dispatchEvent(new dom.window.Event("input"));
+    expect(doc.getElementById("activeFilterSummary")?.textContent).toContain(
+      "Search “no-match”",
+    );
+    expect(doc.getElementById("emptyFilter")?.classList.contains("show")).toBe(
+      true,
+    );
+    doc
+      .getElementById("clearFilters")
+      ?.dispatchEvent(new dom.window.Event("click"));
+    expect((doc.getElementById("search") as HTMLInputElement).value).toBe("");
+    expect(
+      (doc.getElementById("outcomeFilter") as HTMLSelectElement).value,
+    ).toBe("all");
+    expect((doc.getElementById("sort") as HTMLSelectElement).value).toBe(
+      "updated-desc",
+    );
+    expect(doc.getElementById("activeFilterSummary")?.textContent).toBe(
+      "No filters active",
+    );
+    expect(doc.querySelectorAll(".session")).toHaveLength(100);
   });
 
   it("does not render duplicated generic unknown titles", () => {
