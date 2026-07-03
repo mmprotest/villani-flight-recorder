@@ -72,6 +72,44 @@ describe("token telemetry", () => {
     expect(sumTokenUsage(s.events)?.totalTokens).toBe(120);
   });
 
+  it("counts usage once when streaming re-emits records with the same message.id", async () => {
+    const message = {
+      role: "assistant",
+      id: "msg_1",
+      model: "claude-3",
+      usage: { input_tokens: 100, output_tokens: 20 },
+    };
+    const file = await fixture([
+      {
+        type: "assistant",
+        session_id: "s",
+        message: {
+          ...message,
+          content: [{ type: "text", text: "I'll inspect." }],
+        },
+      },
+      {
+        type: "assistant",
+        session_id: "s",
+        message: {
+          ...message,
+          usage: { input_tokens: 100, output_tokens: 35 },
+          content: [
+            {
+              type: "tool_use",
+              id: "toolu_1",
+              name: "Bash",
+              input: { command: "pwd" },
+            },
+          ],
+        },
+      },
+    ]);
+    const s = await parseClaudeSession(file);
+    // Only the last re-emission carries usage, with its updated numbers.
+    expect(sumTokenUsage(s.events)?.totalTokens).toBe(135);
+  });
+
   it("attaches Claude usage to first tool child when no text event is emitted", async () => {
     const file = await fixture([
       {
