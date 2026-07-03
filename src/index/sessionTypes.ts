@@ -16,6 +16,9 @@ export type SessionRecord = {
   indexedAt?: string;
   projectPath?: string;
   projectName?: string;
+  projectId?: string;
+  projectRoot?: string;
+  projectDisplayName?: string;
   title?: string;
   firstPrompt?: string;
   outcome?: Outcome;

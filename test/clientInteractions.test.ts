@@ -7,7 +7,7 @@ import { renderReplay } from "../src/render/renderReplay.js";
 const fx = (p: string) => path.resolve("test/fixtures", p);
 
 describe("client interactions", () => {
-  it("supports timeline clicks, coverage clicks, Raw JSON, and Redaction tabs", async () => {
+  it("supports timeline clicks, Raw JSON, and Redaction tabs", async () => {
     const s = await parseClaudeSession(fx("claude/realistic-transcript.jsonl"));
     const html = await fs.readFile(
       await renderReplay(s, { cwd: process.cwd() }),
@@ -20,12 +20,7 @@ describe("client interactions", () => {
     expect(
       dom.window.document.querySelector("#detailContent")?.textContent,
     ).toContain("Source");
-    dom.window.document
-      .querySelectorAll<HTMLElement>(".coverage-row")[9]
-      .click();
-    expect(
-      dom.window.document.querySelector("#detailContent")?.textContent,
-    ).toContain("Replay Output");
+    expect(dom.window.document.querySelector(".coverage-row")).toBeFalsy();
     dom.window.document
       .querySelector<HTMLElement>('[data-tab="Raw JSON"]')
       ?.click();

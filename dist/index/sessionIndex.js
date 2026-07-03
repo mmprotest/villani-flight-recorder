@@ -1,5 +1,6 @@
 import fs from "node:fs/promises";
 import path from "node:path";
+import { deriveProjectIdentity } from "./projectIdentity.js";
 import { createHash } from "node:crypto";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
@@ -244,6 +245,13 @@ export async function scanToIndex(opts) {
                 const firstEventAt = parsed.startedAt ?? parsed.events.find((e) => e.timestamp)?.timestamp;
                 const lastEventAt = parsed.endedAt ??
                     [...parsed.events].reverse().find((e) => e.timestamp)?.timestamp;
+                const projectIdentity = deriveProjectIdentity({
+                    repoRoots: rs,
+                    repoIds: [...repoIdsByRoot.values()],
+                    cwd: parsed.cwd,
+                    events: parsed.events,
+                    sourcePath: d.sourcePath,
+                });
                 sessions.push({
                     id: sid,
                     provider: ad.id,
@@ -256,8 +264,11 @@ export async function scanToIndex(opts) {
                     createdAt: firstEventAt,
                     updatedAt: lastEventAt ?? fingerprint.modifiedAt,
                     indexedAt: new Date().toISOString(),
-                    projectPath: rs[0],
-                    projectName: rs[0] ? path.basename(rs[0]) : undefined,
+                    projectPath: projectIdentity.projectPath,
+                    projectName: projectIdentity.projectName,
+                    projectId: projectIdentity.projectId,
+                    projectRoot: projectIdentity.projectRoot,
+                    projectDisplayName: projectIdentity.projectDisplayName,
                     title: titleFrom(parsed.events),
                     firstPrompt: parsed.events.find((e) => e.type === "user_message")
                         ?.summary,

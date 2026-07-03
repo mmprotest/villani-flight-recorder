@@ -21,7 +21,7 @@ program
     .name("villani-flight-recorder")
     .description("Black box recorder for AI coding agents\n\nCommon workflow:\n  vfr scan\n  vfr browse\n  vfr replay --id <session-id>")
     .version("0.1.0");
-const RENDERER_VERSION = "0.1.0-replay-checklist-v2";
+const RENDERER_VERSION = "0.1.0-no-coverage-v2";
 async function readManifest(replayDir) {
     try {
         return JSON.parse(await fs.readFile(path.join(replayDir, "manifest.json"), "utf8"));
@@ -171,6 +171,20 @@ async function parse(provider, file) {
         return parsePiSession(file);
     return parseGeneric("unknown", file);
 }
+function projectMatches(s, q) {
+    if (!q)
+        return true;
+    const vals = [
+        s.projectDisplayName,
+        s.projectName,
+        s.projectPath,
+        s.projectRoot,
+        s.projectId,
+        ...(s.repoRoots ?? []),
+        ...(s.repoIds ?? []),
+    ].filter(Boolean);
+    return vals.some((v) => v.toLowerCase().includes(String(q).toLowerCase()));
+}
 function repoMatches(values, q) {
     if (!q)
         return true;
@@ -203,9 +217,7 @@ program
         .filter((s) => (!o.agent || s.provider === o.agent) &&
         (!o.provider || s.provider === o.provider) &&
         (!o.failed || s.outcome === "failed" || s.failedCommandCount > 0) &&
-        (!o.project ||
-            (s.projectName ?? "").includes(o.project) ||
-            (s.projectPath ?? "").includes(o.project)) &&
+        (!o.project || projectMatches(s, o.project)) &&
         repoMatches([...s.repoRoots, ...s.repoIds], o.repo))
         .sort((a, b) => String(b.updatedAt ?? b.lastEventAt ?? "").localeCompare(String(a.updatedAt ?? a.lastEventAt ?? "")))
         .slice(0, o.limit ? Number(o.limit) : 20);
@@ -215,7 +227,8 @@ program
         return console.log("No sessions indexed yet. Run `vfr scan` to index local agent sessions.");
     console.log("ID                 Agent   Outcome  Project              Updated               Events  Failed  Tokens   Title / First Prompt");
     for (const s of rows) {
-        const project = (s.projectName ??
+        const project = (s.projectDisplayName ??
+            s.projectName ??
             idx.repos.find((r) => s.repoIds.includes(r.id))?.name ??
             "-").slice(0, 20);
         const title = (s.title ?? s.firstPrompt ?? "-")

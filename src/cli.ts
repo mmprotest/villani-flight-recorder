@@ -26,7 +26,7 @@ program
   )
   .version("0.1.0");
 
-const RENDERER_VERSION = "0.1.0-replay-checklist-v2";
+const RENDERER_VERSION = "0.1.0-no-coverage-v2";
 type ReplayManifestEntry = {
   sessionId: string;
   sourcePath: string;
@@ -206,6 +206,21 @@ async function parse(provider: Provider, file: string) {
   return parseGeneric("unknown", file);
 }
 
+function projectMatches(s: any, q?: string) {
+  if (!q) return true;
+  const vals = [
+    s.projectDisplayName,
+    s.projectName,
+    s.projectPath,
+    s.projectRoot,
+    s.projectId,
+    ...(s.repoRoots ?? []),
+    ...(s.repoIds ?? []),
+  ].filter(Boolean);
+  return vals.some((v: string) =>
+    v.toLowerCase().includes(String(q).toLowerCase()),
+  );
+}
 function repoMatches(values: string[], q?: string) {
   if (!q) return true;
   const r = path.resolve(q);
@@ -238,9 +253,7 @@ program
           (!o.agent || s.provider === o.agent) &&
           (!o.provider || s.provider === o.provider) &&
           (!o.failed || s.outcome === "failed" || s.failedCommandCount > 0) &&
-          (!o.project ||
-            (s.projectName ?? "").includes(o.project) ||
-            (s.projectPath ?? "").includes(o.project)) &&
+          (!o.project || projectMatches(s, o.project)) &&
           repoMatches([...s.repoRoots, ...s.repoIds], o.repo),
       )
       .sort((a, b) =>
@@ -259,6 +272,7 @@ program
     );
     for (const s of rows) {
       const project = (
+        s.projectDisplayName ??
         s.projectName ??
         idx.repos.find((r) => s.repoIds.includes(r.id))?.name ??
         "-"
