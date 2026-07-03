@@ -7,6 +7,7 @@ import { promisify } from "node:util";
 import { adaptersFor } from "../providers/providerAdapter.js";
 import { readIndex } from "./sessionStore.js";
 import { sumTokenUsage } from "../providers/helpers/tokens.js";
+import { estimateCost } from "../render/pricing.js";
 import { segmentSession } from "./segmenter.js";
 import { writeIndex } from "./sessionStore.js";
 const exec = promisify(execFile);
@@ -242,6 +243,7 @@ export async function scanToIndex(opts) {
                 const failedCommandCount = parsed.events.filter((e) => (e.exitCode ?? 0) !== 0 || e.type === "error").length;
                 const changedFiles = changedEventFiles(parsed.events);
                 const tokenUsage = sumTokenUsage(parsed.events);
+                const costEstimate = estimateCost(parsed.events);
                 const firstEventAt = parsed.startedAt ?? parsed.events.find((e) => e.timestamp)?.timestamp;
                 const lastEventAt = parsed.endedAt ??
                     [...parsed.events].reverse().find((e) => e.timestamp)?.timestamp;
@@ -294,6 +296,9 @@ export async function scanToIndex(opts) {
                             (tokenUsage.cachedTokens ?? 0)
                         : undefined,
                     reasoningTokenCount: tokenUsage?.reasoningTokens,
+                    costUsd: costEstimate.perModel.length
+                        ? costEstimate.totalUsd
+                        : undefined,
                     sourceHash: fingerprint.hash,
                     sourceSize: fingerprint.sizeBytes,
                     sourceMtimeMs: fingerprint.mtimeMs,

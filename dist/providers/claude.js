@@ -14,7 +14,17 @@ export async function parseClaudeSession(sessionPath) {
     let n = 0;
     const toolUsesById = new Map();
     const push = (e) => events.push({ ...e, title: e.title || makeHumanEventTitle(e) });
-    for (const r of recs) {
+    // Streaming transcripts re-emit a message (same message.id) once per
+    // content block, each record carrying that API call's usage again. Only
+    // the last record per message.id may attach usage, so a call is never
+    // counted more than once.
+    const lastUsageIndexByMessageId = new Map();
+    recs.forEach((r, i) => {
+        const id = obj(obj(r.value).message).id;
+        if (typeof id === "string" && extractTokenUsage(r.value))
+            lastUsageIndexByMessageId.set(id, i);
+    });
+    for (const [recIndex, r] of recs.entries()) {
         if (r.error) {
             const w = `Line ${r.line}: ${r.error}`;
             warnings.push(w);
@@ -108,7 +118,11 @@ export async function parseClaudeSession(sessionPath) {
         }
         if (role === "assistant" || o.type === "assistant") {
             const text = contentText(content);
-            const tokenUsage = extractTokenUsage(o);
+            const messageId = typeof msg.id === "string" ? msg.id : undefined;
+            const tokenUsage = messageId !== undefined &&
+                lastUsageIndexByMessageId.get(messageId) !== recIndex
+                ? undefined
+                : extractTokenUsage(o);
             let tokenUsageAttached = false;
             if (text) {
                 tokenUsageAttached = Boolean(tokenUsage);
@@ -119,6 +133,7 @@ export async function parseClaudeSession(sessionPath) {
                     summary: text,
                     raw: { ...o, model },
                     tokenUsage,
+                    model,
                 }));
             }
             for (const b of blocks(content).filter((b) => b.type === "tool_use")) {
@@ -142,6 +157,7 @@ export async function parseClaudeSession(sessionPath) {
                     path: c.path,
                     summary: name,
                     tokenUsage: !tokenUsageAttached ? tokenUsage : undefined,
+                    model,
                 }));
                 tokenUsageAttached = tokenUsageAttached || Boolean(tokenUsage);
             }

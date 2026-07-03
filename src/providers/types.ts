@@ -50,6 +50,7 @@ export interface FlightEvent {
   raw?: unknown;
   warnings?: string[];
   tokenUsage?: TokenUsage;
+  model?: string;
 }
 
 export interface ParseSessionInput {
