@@ -91,6 +91,18 @@ vfr launch
 
 Unchanged sessions are skipped before parsing and unchanged replay files are reused. Use `--rebuild` to force a full rescan and replay regeneration.
 
+## Browse by project or repo
+
+After scanning, the session browser can filter and group sessions by project/repo. The common workflow is:
+
+```bash
+vfr launch --provider claude
+```
+
+Use the Project filter to narrow the browser to one repo, project, or work item. Use Group by Project to review runs project by project, then select a session and open its replay to inspect the timeline, event details, token usage, changed files, diffs, and raw metadata.
+
+Tokens are shown when provider transcripts include usage metadata. Coverage diagnostics have been removed; replay reports now focus on the captured outcome, timeline, selected event detail, tokens, changed files, diffs, and raw metadata.
+
 ## Delta and reuse behavior
 
 VFR stores source file size and modified time in the local index. On the next scan, unchanged files are reused from the index without reading and parsing the transcript again. New or changed files are hashed, parsed, and indexed. Missing source files are removed from the refreshed index.

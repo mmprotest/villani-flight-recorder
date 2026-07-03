@@ -22,7 +22,6 @@ describe("rendered HTML", () => {
     for (const text of [
       "Villani Flight Recorder",
       "Replay Event Timeline",
-      "Replay coverage",
       "Captured run outcome",
       "events captured",
       "provider",
@@ -49,13 +48,10 @@ describe("rendered HTML", () => {
     expect(html).toContain("Generated with warnings");
     expect(html).toContain("Failed: 1 failed test");
     expect(html).not.toContain("Failed, 1 failed tests");
-    expect(html).toContain("Recorder pipeline");
-    expect(html).toContain("Captured evidence");
     expect(html).not.toContain("execution-graph-stage");
     expect(html).not.toContain("graph-lane-label");
     expect(html).toContain("Design tokens");
     expect(html).toContain("Investigation report layout");
-    expect(html).toContain("Replay coverage");
     expect(html).toContain("Detail panel");
     expect(html).not.toMatch(/https?:\/\//);
     for (const match of html.matchAll(/<script>([\s\S]*?)<\/script>/g))
@@ -98,7 +94,7 @@ describe("rendered HTML", () => {
     expect(vm.changedFiles).not.toContain("dirty.txt");
   });
 
-  it("renders structured timeline, coverage checklist, detail tabs, and interactions", async () => {
+  it("renders structured timeline, detail tabs, and interactions without replay coverage", async () => {
     const s = await parseClaudeSession(fx("claude/realistic-transcript.jsonl"));
     const html = await fs.readFile(
       await renderReplay(s, { cwd: process.cwd() }),
@@ -113,30 +109,13 @@ describe("rendered HTML", () => {
     expect(
       times.every((t) => !t.includes("T") && !/\d{4}-\d{2}-\d{2}/.test(t)),
     ).toBe(true);
-    expect(doc.querySelectorAll(".coverage-title").length).toBeGreaterThan(0);
     expect(doc.querySelector(".run-summary h2")?.textContent).toMatch(
       /Failed|Succeeded|Warning|Not applicable/,
     );
-    expect(doc.querySelector(".coverage-checklist")).toBeTruthy();
-    expect(
-      [...doc.querySelectorAll(".coverage-title")].some(
-        (n) => n.textContent === "Commands",
-      ),
-    ).toBe(true);
-    expect(
-      [...doc.querySelectorAll(".coverage-summary")].some((n) =>
-        /Tools and tests|failed test|failed cmd|No commands|No command/.test(
-          n.textContent ?? "",
-        ),
-      ),
-    ).toBe(true);
-    expect(
-      [...doc.querySelectorAll(".coverage-title")].some(
-        (n) => n.textContent === "Commands / Tools",
-      ),
-    ).toBe(false);
+    expect(doc.querySelector(".coverage-checklist")).toBeFalsy();
+    expect(doc.querySelectorAll(".coverage-title").length).toBe(0);
     expect(doc.body.textContent).toContain("Source");
-    expect(doc.body.textContent).toContain("Replay coverage");
+    expect(doc.body.textContent).not.toContain("Replay" + " coverage");
     expect(doc.body.textContent).toContain("Issue");
     expect(html).not.toContain("N/A NO REPO");
     expect(html).toContain("@media (max-width: 900px)");
@@ -184,10 +163,6 @@ describe("rendered HTML", () => {
       children.findIndex((c) => c.includes("investigation-grid")),
     ).toBeLessThan(children.findIndex((c) => c.includes("metadata-strip")));
 
-    doc.querySelector<HTMLElement>("[data-graph-index]")?.click();
-    expect(doc.querySelector("#detailContent")?.textContent).toContain(
-      "Coverage diagnostic",
-    );
     [...doc.querySelectorAll<HTMLElement>(".tab")]
       .find((n) => n.dataset.tab === "Raw JSON")
       ?.click();
