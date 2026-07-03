@@ -13,6 +13,7 @@ import { Provider, ParsedSession } from "./providers/types.js";
 import { scanToIndex } from "./index/sessionIndex.js";
 import { readIndex, defaultIndexDir } from "./index/sessionStore.js";
 import { renderSessionBrowser } from "./render/sessionBrowser.js";
+import { formatTokenCount } from "./providers/helpers/tokens.js";
 import { adaptersFor } from "./providers/providerAdapter.js";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -254,7 +255,7 @@ program
         "No sessions indexed yet. Run `vfr scan` to index local agent sessions.",
       );
     console.log(
-      "ID                 Agent   Outcome  Project              Updated               Events  Failed  Title / First Prompt",
+      "ID                 Agent   Outcome  Project              Updated               Events  Failed  Tokens   Title / First Prompt",
     );
     for (const s of rows) {
       const project = (
@@ -266,7 +267,7 @@ program
         .replace(/\s+/g, " ")
         .slice(0, 60);
       console.log(
-        `${s.id.padEnd(18)} ${String(s.provider).padEnd(7)} ${String(s.outcome ?? "unknown").padEnd(8)} ${project.padEnd(20)} ${String(s.updatedAt ?? s.lastEventAt ?? "-").padEnd(20)} ${String(s.eventCount).padEnd(7)} ${String(s.failedCommandCount).padEnd(7)} ${title}`,
+        `${s.id.padEnd(18)} ${String(s.provider).padEnd(7)} ${String(s.outcome ?? "unknown").padEnd(8)} ${project.padEnd(20)} ${String(s.updatedAt ?? s.lastEventAt ?? "-").padEnd(20)} ${String(s.eventCount).padEnd(7)} ${String(s.failedCommandCount).padEnd(7)} ${formatTokenCount(s.tokenCount).padEnd(8)} ${title}`,
       );
     }
   });

@@ -25,6 +25,10 @@ export type SessionRecord = {
   durationMs?: number;
   failureSummary?: string;
   tokenCount?: number;
+  inputTokenCount?: number;
+  outputTokenCount?: number;
+  cacheTokenCount?: number;
+  reasoningTokenCount?: number;
   costUsd?: number;
   sourceHash?: string;
   sourceSize?: number;

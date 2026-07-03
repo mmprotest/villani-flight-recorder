@@ -20,6 +20,17 @@ export type FlightEventType =
   | "git_status"
   | "unknown";
 
+export interface TokenUsage {
+  inputTokens?: number;
+  outputTokens?: number;
+  totalTokens?: number;
+  cacheCreationTokens?: number;
+  cacheReadTokens?: number;
+  cachedTokens?: number;
+  reasoningTokens?: number;
+  source?: string;
+}
+
 export interface FlightEvent {
   id: string;
   provider: Provider;
@@ -38,6 +49,7 @@ export interface FlightEvent {
   diff?: string;
   raw?: unknown;
   warnings?: string[];
+  tokenUsage?: TokenUsage;
 }
 
 export interface ParseSessionInput {
@@ -56,6 +68,7 @@ export interface ParseSessionResult {
   endedAt?: string;
   events: FlightEvent[];
   warnings: string[];
+  tokenUsage?: TokenUsage;
 }
 
 export type ParsedSession = ParseSessionResult & { path?: string };

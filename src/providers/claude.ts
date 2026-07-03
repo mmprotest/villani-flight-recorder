@@ -10,6 +10,7 @@ import {
 import { readJsonl } from "../utils/jsonl.js";
 import { blocks, contentText } from "./helpers/content.js";
 import { timestampOf } from "./helpers/timestamps.js";
+import { extractTokenUsage } from "./helpers/tokens.js";
 import { classifyTool } from "./helpers/tools.js";
 import { finish } from "./generic.js";
 import { assertProviderSession } from "./detect.js";
@@ -179,7 +180,10 @@ export async function parseClaudeSession(
     }
     if (role === "assistant" || o.type === "assistant") {
       const text = contentText(content);
-      if (text)
+      const tokenUsage = extractTokenUsage(o);
+      let tokenUsageAttached = false;
+      if (text) {
+        tokenUsageAttached = Boolean(tokenUsage);
         push(
           event(
             `claude-${++n}`,
@@ -193,9 +197,11 @@ export async function parseClaudeSession(
               cwd,
               summary: text,
               raw: { ...o, model },
+              tokenUsage,
             },
           ),
         );
+      }
       for (const b of blocks(content).filter((b) => b.type === "tool_use")) {
         const name = String(b.name ?? "tool");
         const c = classifyTool(name, b.input);
@@ -223,9 +229,11 @@ export async function parseClaudeSession(
               command: c.command,
               path: c.path,
               summary: name,
+              tokenUsage: !tokenUsageAttached ? tokenUsage : undefined,
             },
           ),
         );
+        tokenUsageAttached = tokenUsageAttached || Boolean(tokenUsage);
       }
       continue;
     }

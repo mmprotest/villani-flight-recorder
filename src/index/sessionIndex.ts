@@ -6,6 +6,7 @@ import { promisify } from "node:util";
 import { adaptersFor } from "../providers/providerAdapter.js";
 import { readIndex } from "./sessionStore.js";
 import { FlightEvent } from "../providers/types.js";
+import { sumTokenUsage } from "../providers/helpers/tokens.js";
 import { SessionIndex, RepoRecord } from "./sessionTypes.js";
 import { segmentSession } from "./segmenter.js";
 import { writeIndex } from "./sessionStore.js";
@@ -280,6 +281,7 @@ export async function scanToIndex(opts: {
           (e) => (e.exitCode ?? 0) !== 0 || e.type === "error",
         ).length;
         const changedFiles = changedEventFiles(parsed.events);
+        const tokenUsage = sumTokenUsage(parsed.events);
         const firstEventAt =
           parsed.startedAt ?? parsed.events.find((e) => e.timestamp)?.timestamp;
         const lastEventAt =
@@ -313,6 +315,19 @@ export async function scanToIndex(opts: {
           model: parsed.model,
           durationMs: durationMs(parsed.events, firstEventAt, lastEventAt),
           failureSummary: failureSummary(parsed.events),
+          tokenCount: tokenUsage?.totalTokens,
+          inputTokenCount: tokenUsage?.inputTokens,
+          outputTokenCount: tokenUsage?.outputTokens,
+          cacheTokenCount:
+            tokenUsage &&
+            (tokenUsage.cacheCreationTokens !== undefined ||
+              tokenUsage.cacheReadTokens !== undefined ||
+              tokenUsage.cachedTokens !== undefined)
+              ? (tokenUsage.cacheCreationTokens ?? 0) +
+                (tokenUsage.cacheReadTokens ?? 0) +
+                (tokenUsage.cachedTokens ?? 0)
+              : undefined,
+          reasoningTokenCount: tokenUsage?.reasoningTokens,
           sourceHash: fingerprint.hash,
           sourceSize: fingerprint.sizeBytes,
           sourceMtimeMs: fingerprint.mtimeMs,

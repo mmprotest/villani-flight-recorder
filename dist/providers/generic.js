@@ -1,6 +1,7 @@
 import { readJsonl } from "../utils/jsonl.js";
 import { event, extractCommand, extractPath, isTestCommand, makeHumanEventTitle, obj, textOf, } from "../normalize/events.js";
 import { timestampOf } from "./helpers/timestamps.js";
+import { extractTokenUsage } from "./helpers/tokens.js";
 export async function parseGeneric(provider, sessionPath) {
     const recs = await readJsonl(sessionPath);
     const events = [];
@@ -48,6 +49,7 @@ export async function parseGeneric(provider, sessionPath) {
                 : typeof o.duration_ms === "number"
                     ? o.duration_ms
                     : undefined,
+            tokenUsage: extractTokenUsage(r.value),
             title: "",
         });
         e.title =

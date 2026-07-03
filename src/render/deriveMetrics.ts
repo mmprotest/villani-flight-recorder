@@ -1,4 +1,8 @@
 import { ParsedSession } from "../providers/types.js";
+import {
+  formatTokenCount,
+  sumTokenUsage,
+} from "../providers/helpers/tokens.js";
 import { fmtDuration, fmtTime, MetricCardViewModel } from "./viewModel.js";
 import {
   CapturedRunStatusSummary,
@@ -23,6 +27,32 @@ export function deriveMetrics(
   replayStatus: ReplayStatusSummary,
   capturedRunStatus: CapturedRunStatusSummary,
 ): MetricCardViewModel[] {
+  const tokenUsage = sumTokenUsage(session.events);
+  const cacheTokens =
+    tokenUsage &&
+    (tokenUsage.cacheCreationTokens !== undefined ||
+      tokenUsage.cacheReadTokens !== undefined ||
+      tokenUsage.cachedTokens !== undefined)
+      ? (tokenUsage.cacheCreationTokens ?? 0) +
+        (tokenUsage.cacheReadTokens ?? 0) +
+        (tokenUsage.cachedTokens ?? 0)
+      : undefined;
+  const tokenParts = [
+    tokenUsage?.inputTokens !== undefined
+      ? `input ${formatTokenCount(tokenUsage.inputTokens)}`
+      : undefined,
+    tokenUsage?.outputTokens !== undefined
+      ? `output ${formatTokenCount(tokenUsage.outputTokens)}`
+      : undefined,
+    cacheTokens !== undefined
+      ? `cache ${formatTokenCount(cacheTokens)}`
+      : undefined,
+    tokenUsage?.reasoningTokens !== undefined
+      ? `reasoning ${formatTokenCount(tokenUsage.reasoningTokens)}`
+      : undefined,
+  ]
+    .filter(Boolean)
+    .join(" · ");
   const dur =
     session.startedAt && session.endedAt
       ? fmtDuration(
@@ -59,11 +89,17 @@ export function deriveMetrics(
     {
       id: "tokens",
       label: "TOKENS",
-      value: "Not captured",
-      subvalue: "No token telemetry",
+      value:
+        tokenUsage?.totalTokens !== undefined
+          ? formatTokenCount(tokenUsage.totalTokens)
+          : "Not captured",
+      subvalue:
+        tokenUsage?.totalTokens !== undefined
+          ? tokenParts || "Token telemetry captured"
+          : "No token telemetry",
       icon: "tokens",
-      telemetryAvailable: false,
-      empty: true,
+      telemetryAvailable: tokenUsage?.totalTokens !== undefined,
+      empty: tokenUsage?.totalTokens === undefined,
     },
     {
       id: "cost",

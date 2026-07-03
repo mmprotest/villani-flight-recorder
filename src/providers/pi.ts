@@ -6,6 +6,7 @@ import {
 } from "../normalize/events.js";
 import { readJsonl } from "../utils/jsonl.js";
 import { timestampOf } from "./helpers/timestamps.js";
+import { extractTokenUsage } from "./helpers/tokens.js";
 import { classifyTool } from "./helpers/tools.js";
 import { finish } from "./generic.js";
 import { assertProviderSession } from "./detect.js";
@@ -73,7 +74,13 @@ export async function parsePiSession(
           role === "user" ? "user_message" : "assistant_message",
           role === "user" ? "User prompt" : "Assistant response",
           r.value,
-          { timestamp: ts, sessionId, cwd, summary: textOf(o.content) },
+          {
+            timestamp: ts,
+            sessionId,
+            cwd,
+            summary: textOf(o.content),
+            tokenUsage: role === "user" ? undefined : extractTokenUsage(o),
+          },
         ),
       );
       continue;
@@ -153,7 +160,13 @@ export async function parsePiSession(
           "assistant_message",
           "Branch summary",
           r.value,
-          { timestamp: ts, sessionId, cwd, summary: textOf(o.summary) },
+          {
+            timestamp: ts,
+            sessionId,
+            cwd,
+            summary: textOf(o.summary),
+            tokenUsage: extractTokenUsage(o),
+          },
         ),
       );
       continue;
