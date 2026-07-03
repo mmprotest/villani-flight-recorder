@@ -198,6 +198,7 @@ export async function parseClaudeSession(
               summary: text,
               raw: { ...o, model },
               tokenUsage,
+              model,
             },
           ),
         );
@@ -230,6 +231,7 @@ export async function parseClaudeSession(
               path: c.path,
               summary: name,
               tokenUsage: !tokenUsageAttached ? tokenUsage : undefined,
+              model,
             },
           ),
         );

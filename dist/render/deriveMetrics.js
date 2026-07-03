@@ -1,5 +1,6 @@
 import { formatTokenCount, sumTokenUsage, } from "../providers/helpers/tokens.js";
 import { fmtDuration, fmtTime } from "./viewModel.js";
+import { estimateCost, formatUsd, shortModelName } from "./pricing.js";
 const task = (s) => s.events.find((e) => e.type === "user_message")?.summary ??
     s.events.find((e) => e.type === "user_message")?.title ??
     (s.provider === "unknown" ? "Task unavailable" : "Task unavailable");
@@ -38,6 +39,32 @@ export function deriveMetrics(session, replayStatus, capturedRunStatus) {
     ]
         .filter(Boolean)
         .join(" · ");
+    const cost = estimateCost(session.events);
+    const costPartial = cost.unknownModels.length > 0 || cost.hasUsageWithoutModel;
+    const costCard = cost.perModel.length > 0
+        ? {
+            id: "cost",
+            label: "EST. COST (USD)",
+            value: `${costPartial ? "≥ " : ""}${formatUsd(cost.totalUsd)}`,
+            subvalue: [
+                cost.perModel
+                    .map((m) => `${shortModelName(m.model)} ${formatUsd(m.usd)}`)
+                    .join(" · "),
+                costPartial ? "partial — some usage not priceable" : undefined,
+                "estimate from list pricing",
+            ]
+                .filter(Boolean)
+                .join(" · "),
+            icon: "cost",
+        }
+        : {
+            id: "cost",
+            label: "COST (USD)",
+            value: "Not captured",
+            subvalue: "No cost telemetry",
+            icon: "cost",
+            empty: true,
+        };
     const dur = session.startedAt && session.endedAt
         ? fmtDuration(new Date(session.endedAt).getTime() -
             new Date(session.startedAt).getTime())
@@ -81,14 +108,7 @@ export function deriveMetrics(session, replayStatus, capturedRunStatus) {
             telemetryAvailable: tokenUsage?.totalTokens !== undefined,
             empty: tokenUsage?.totalTokens === undefined,
         },
-        {
-            id: "cost",
-            label: "COST (USD)",
-            value: "Not captured",
-            subvalue: "No cost telemetry",
-            icon: "cost",
-            empty: true,
-        },
+        costCard,
         {
             id: "status",
             label: "STATUS",

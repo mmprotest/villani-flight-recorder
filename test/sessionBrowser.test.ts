@@ -295,3 +295,61 @@ it("renders robust session rows instead of the fragile column layout", () => {
   expect(html).toContain("session-row-source");
   expect(html).toContain("overflow-wrap:anywhere");
 });
+
+describe("subagent rollup", () => {
+  const uuid = "018f6e2a-1111-4222-8333-444455556666";
+  it("badges subagent rows and rolls totals into the parent", () => {
+    const html = renderSessionBrowser(
+      idx([
+        {
+          ...base,
+          id: "parent",
+          provider: "claude",
+          providerLabel: "Claude",
+          outcome: "success",
+          title: "Parent session",
+          sourcePath: `/tmp/proj/${uuid}.jsonl`,
+          tokenCount: 1000,
+          costUsd: 1.0,
+        },
+        {
+          ...base,
+          id: "sub",
+          provider: "claude",
+          providerLabel: "Claude",
+          outcome: "success",
+          title: "Subagent session",
+          sourcePath: `/tmp/proj/${uuid}/subagents/agent-a1b2.jsonl`,
+          tokenCount: 500,
+          costUsd: 0.5,
+        },
+      ]),
+    );
+    expect(html).toContain('"rollupNote":"incl. 1 subagent"');
+    expect(html).toContain('"tokenCount":1500');
+    expect(html).toContain('"costLabel":"$1.50 est."');
+    expect(html).toContain('"isSubagent":true');
+    expect(html).toContain('"subagentOf":"parent"');
+    expect(html).toContain("subagent-badge");
+  });
+
+  it("leaves unrelated sessions untouched", () => {
+    const html = renderSessionBrowser(
+      idx([
+        {
+          ...base,
+          id: "solo",
+          provider: "claude",
+          providerLabel: "Claude",
+          outcome: "success",
+          title: "Solo session",
+          sourcePath: "/tmp/solo.jsonl",
+          tokenCount: 100,
+        },
+      ]),
+    );
+    expect(html).not.toContain('"isSubagent":true');
+    expect(html).not.toContain('"rollupNote":"incl.');
+    expect(html).toContain('"tokenCount":100');
+  });
+});

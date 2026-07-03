@@ -119,6 +119,7 @@ export async function parseClaudeSession(sessionPath) {
                     summary: text,
                     raw: { ...o, model },
                     tokenUsage,
+                    model,
                 }));
             }
             for (const b of blocks(content).filter((b) => b.type === "tool_use")) {
@@ -142,6 +143,7 @@ export async function parseClaudeSession(sessionPath) {
                     path: c.path,
                     summary: name,
                     tokenUsage: !tokenUsageAttached ? tokenUsage : undefined,
+                    model,
                 }));
                 tokenUsageAttached = tokenUsageAttached || Boolean(tokenUsage);
             }
