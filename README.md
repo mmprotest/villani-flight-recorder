@@ -162,3 +162,11 @@ npm run format:check
 npm pack --dry-run
 npm exec -- vfr --version
 ```
+
+## Token telemetry
+
+Villani Flight Recorder shows token counts when the source transcript contains provider usage metadata. Claude, Codex, Pi, and generic transcript parsers normalize common `usage`, `message.usage`, `response.usage`, `result.usage`, `token_usage`, and `metrics.usage` fields where available.
+
+Some events, especially command, file, hook, and other non-model events, do not have token usage because providers typically do not log model token telemetry for those records. The app stays honest in those cases and reports token usage as unavailable rather than inventing values.
+
+Cost remains unavailable unless reliable pricing or captured cost metadata is present; token telemetry alone is not used to estimate cost.

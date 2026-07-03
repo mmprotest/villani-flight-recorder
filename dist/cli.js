@@ -12,6 +12,7 @@ import { installHooks, appendHook } from "./hooks/installHooks.js";
 import { scanToIndex } from "./index/sessionIndex.js";
 import { readIndex, defaultIndexDir } from "./index/sessionStore.js";
 import { renderSessionBrowser } from "./render/sessionBrowser.js";
+import { formatTokenCount } from "./providers/helpers/tokens.js";
 import { adaptersFor } from "./providers/providerAdapter.js";
 import fs from "node:fs/promises";
 import path from "node:path";
@@ -212,7 +213,7 @@ program
         return console.log(JSON.stringify(rows, null, 2));
     if (!rows.length)
         return console.log("No sessions indexed yet. Run `vfr scan` to index local agent sessions.");
-    console.log("ID                 Agent   Outcome  Project              Updated               Events  Failed  Title / First Prompt");
+    console.log("ID                 Agent   Outcome  Project              Updated               Events  Failed  Tokens   Title / First Prompt");
     for (const s of rows) {
         const project = (s.projectName ??
             idx.repos.find((r) => s.repoIds.includes(r.id))?.name ??
@@ -220,7 +221,7 @@ program
         const title = (s.title ?? s.firstPrompt ?? "-")
             .replace(/\s+/g, " ")
             .slice(0, 60);
-        console.log(`${s.id.padEnd(18)} ${String(s.provider).padEnd(7)} ${String(s.outcome ?? "unknown").padEnd(8)} ${project.padEnd(20)} ${String(s.updatedAt ?? s.lastEventAt ?? "-").padEnd(20)} ${String(s.eventCount).padEnd(7)} ${String(s.failedCommandCount).padEnd(7)} ${title}`);
+        console.log(`${s.id.padEnd(18)} ${String(s.provider).padEnd(7)} ${String(s.outcome ?? "unknown").padEnd(8)} ${project.padEnd(20)} ${String(s.updatedAt ?? s.lastEventAt ?? "-").padEnd(20)} ${String(s.eventCount).padEnd(7)} ${String(s.failedCommandCount).padEnd(7)} ${formatTokenCount(s.tokenCount).padEnd(8)} ${title}`);
     }
 });
 program

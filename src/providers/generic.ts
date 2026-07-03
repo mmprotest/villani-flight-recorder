@@ -15,6 +15,7 @@ import {
   Provider,
 } from "./types.js";
 import { timestampOf } from "./helpers/timestamps.js";
+import { extractTokenUsage } from "./helpers/tokens.js";
 
 export async function parseGeneric(
   provider: Provider,
@@ -78,6 +79,7 @@ export async function parseGeneric(
             : typeof o.duration_ms === "number"
               ? o.duration_ms
               : undefined,
+        tokenUsage: extractTokenUsage(r.value),
         title: "",
       },
     );

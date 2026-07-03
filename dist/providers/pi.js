@@ -1,6 +1,7 @@
 import { event, makeHumanEventTitle, obj, textOf, } from "../normalize/events.js";
 import { readJsonl } from "../utils/jsonl.js";
 import { timestampOf } from "./helpers/timestamps.js";
+import { extractTokenUsage } from "./helpers/tokens.js";
 import { classifyTool } from "./helpers/tools.js";
 import { finish } from "./generic.js";
 import { assertProviderSession } from "./detect.js";
@@ -43,7 +44,13 @@ export async function parsePiSession(sessionPath) {
         }
         if (type === "message") {
             const role = String(o.role);
-            push(event(`pi-${++n}`, "pi", role === "user" ? "user_message" : "assistant_message", role === "user" ? "User prompt" : "Assistant response", r.value, { timestamp: ts, sessionId, cwd, summary: textOf(o.content) }));
+            push(event(`pi-${++n}`, "pi", role === "user" ? "user_message" : "assistant_message", role === "user" ? "User prompt" : "Assistant response", r.value, {
+                timestamp: ts,
+                sessionId,
+                cwd,
+                summary: textOf(o.content),
+                tokenUsage: role === "user" ? undefined : extractTokenUsage(o),
+            }));
             continue;
         }
         if (type === "tool_call" || type === "tool_execution_start") {
@@ -86,7 +93,13 @@ export async function parsePiSession(sessionPath) {
             continue;
         }
         if (type === "branch_summary") {
-            push(event(`pi-${++n}`, "pi", "assistant_message", "Branch summary", r.value, { timestamp: ts, sessionId, cwd, summary: textOf(o.summary) }));
+            push(event(`pi-${++n}`, "pi", "assistant_message", "Branch summary", r.value, {
+                timestamp: ts,
+                sessionId,
+                cwd,
+                summary: textOf(o.summary),
+                tokenUsage: extractTokenUsage(o),
+            }));
             continue;
         }
         if (type === "model_change") {

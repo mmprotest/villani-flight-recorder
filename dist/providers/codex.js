@@ -1,6 +1,7 @@
 import { event, extractPatchTouchedFiles, makeHumanEventTitle, obj, textOf, } from "../normalize/events.js";
 import { readJsonl } from "../utils/jsonl.js";
 import { timestampOf } from "./helpers/timestamps.js";
+import { extractTokenUsage } from "./helpers/tokens.js";
 import { classifyTool } from "./helpers/tools.js";
 import { finish } from "./generic.js";
 import { assertProviderSession } from "./detect.js";
@@ -51,7 +52,13 @@ export async function parseCodexSession(sessionPath) {
             continue;
         }
         if (type === "assistant_message") {
-            push(event(`codex-${++n}`, "codex", "assistant_message", "Assistant response", r.value, { timestamp: ts, sessionId, cwd, summary: textOf(o.message) }));
+            push(event(`codex-${++n}`, "codex", "assistant_message", "Assistant response", r.value, {
+                timestamp: ts,
+                sessionId,
+                cwd,
+                summary: textOf(o.message),
+                tokenUsage: extractTokenUsage(o),
+            }));
             continue;
         }
         if (type === "tool_call") {
@@ -97,7 +104,13 @@ export async function parseCodexSession(sessionPath) {
             }));
             continue;
         }
-        push(event(`codex-${++n}`, "codex", "unknown", `Unknown Codex event: ${type}`, r.value, { timestamp: ts, sessionId, cwd, summary: textOf(o) }));
+        push(event(`codex-${++n}`, "codex", "unknown", `Unknown Codex event: ${type}`, r.value, {
+            timestamp: ts,
+            sessionId,
+            cwd,
+            summary: textOf(o),
+            tokenUsage: extractTokenUsage(o),
+        }));
     }
     return finish("codex", sessionPath, events, warnings, recs.map((r) => r.value));
 }
