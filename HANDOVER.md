@@ -16,6 +16,7 @@ Last updated: 2026-07-04.
 The scan pipeline is authoritative for token/cost numbers:
 
 - `vfr scan` parses transcripts and stores `tokenCount` / `inputTokenCount` / `outputTokenCount` / `cacheTokenCount` / `costUsd` on each index record (`src/index/sessionIndex.ts`).
+- `SessionRecord` also stores the cache split as `cacheCreationTokenCount` / `cacheReadTokenCount` (used by `vfr analyze`); pre-existing index entries need `vfr scan --rebuild` to backfill them.
 - The session browser reads those stored fields and adds a subagent roll-up via `subagentRollup()` in `src/index/subagents.ts`.
 - The replay renderer receives the same stored stats as `IndexSessionStats`, threaded `cli.ts → renderReplay → renderDashboard → deriveReplayViewModel → deriveMetrics`. The live `sumTokenUsage`/`estimateCost` recompute is a **fallback only** (used when index fields are undefined, and for `--segment`/sliced replays where whole-session totals would misreport).
 
