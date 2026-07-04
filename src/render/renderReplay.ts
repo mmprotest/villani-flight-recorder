@@ -3,6 +3,7 @@ import path from "node:path";
 import { ParsedSession } from "../providers/types.js";
 import { getGitInfo } from "../git/gitInfo.js";
 import { renderDashboard } from "./dashboard.js";
+import { IndexSessionStats } from "./deriveMetrics.js";
 import { replayRoot, safeSegment } from "../utils/paths.js";
 import { redactDeep } from "../redaction/redact.js";
 export async function renderReplay(
@@ -13,6 +14,7 @@ export async function renderReplay(
     out?: string;
     returnHref?: string;
     returnLabel?: string;
+    indexStats?: IndexSessionStats;
   } = {},
 ) {
   const cwd = opts.cwd ?? process.cwd();
@@ -32,7 +34,11 @@ export async function renderReplay(
   const html = renderDashboard(
     s,
     opts.redact === false ? git : redactDeep(git),
-    { returnHref: opts.returnHref, returnLabel: opts.returnLabel },
+    {
+      returnHref: opts.returnHref,
+      returnLabel: opts.returnLabel,
+      indexStats: opts.indexStats,
+    },
   );
   await fs.writeFile(file, html, "utf8");
   return file;

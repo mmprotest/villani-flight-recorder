@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   isSubagentTranscript,
+  rollupSubagentTotals,
   subagentParentPath,
+  subagentRollup,
 } from "../src/index/subagents.js";
 
 const uuid = "018f6e2a-1111-4222-8333-444455556666";
@@ -27,5 +29,44 @@ describe("subagent transcript detection", () => {
       expect(isSubagentTranscript(p), p).toBe(false);
       expect(subagentParentPath(p), p).toBeUndefined();
     }
+  });
+});
+
+describe("subagent roll-up", () => {
+  const parent = {
+    sourcePath: `/home/u/.claude/projects/foo/${uuid}.jsonl`,
+    tokenCount: 100,
+    costUsd: 1,
+  };
+  const childA = {
+    sourcePath: `/home/u/.claude/projects/foo/${uuid}/subagents/a.jsonl`,
+    tokenCount: 40,
+    costUsd: 0.5,
+  };
+  const childB = {
+    sourcePath: `/home/u/.claude/projects/foo/${uuid}/subagents/b.jsonl`,
+  };
+
+  it("sums parent and child tokenCount/costUsd, skipping undefined fields", () => {
+    expect(subagentRollup(parent, [parent, childA, childB])).toEqual({
+      subagentCount: 2,
+      tokenCount: 140,
+      costUsd: 1.5,
+    });
+  });
+
+  it("returns undefined when the session has no subagent children", () => {
+    const unrelated = {
+      sourcePath: "/home/u/.claude/projects/foo/other.jsonl",
+      tokenCount: 7,
+    };
+    expect(subagentRollup(parent, [parent, unrelated])).toBeUndefined();
+  });
+
+  it("keeps totals undefined when no family member carries them", () => {
+    expect(rollupSubagentTotals([{}, {}])).toEqual({
+      tokenCount: undefined,
+      costUsd: undefined,
+    });
   });
 });

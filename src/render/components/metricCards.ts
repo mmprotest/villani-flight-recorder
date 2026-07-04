@@ -24,9 +24,10 @@ export const metricCards = (vm: ReplayDashboardViewModel) => {
   const runner = metric(vm.metrics, "runner");
   const tokens = metric(vm.metrics, "tokens");
   const cost = metric(vm.metrics, "cost");
+  const subagents = metric(vm.metrics, "subagents");
   const duration = metric(vm.metrics, "duration");
   const runId = metric(vm.metrics, "runid");
-  const optionalFacts = [tokens, cost]
+  const optionalFacts = [tokens, cost, subagents]
     .filter((m): m is MetricCardViewModel => Boolean(m && !m.empty))
     .map(
       (m) =>

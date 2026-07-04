@@ -18,3 +18,42 @@ export function subagentParentPath(sourcePath) {
     const uuidDir = path.dirname(path.dirname(sourcePath));
     return path.join(path.dirname(uuidDir), `${m[1]}.jsonl`);
 }
+/**
+ * Combined token and estimated-cost totals across a session family
+ * (parent first, then its subagent children). A field stays undefined
+ * when no family member carries it.
+ */
+export function rollupSubagentTotals(family) {
+    const tokens = family
+        .map((x) => x.tokenCount)
+        .filter((n) => typeof n === "number");
+    const costs = family
+        .map((x) => x.costUsd)
+        .filter((n) => typeof n === "number");
+    return {
+        tokenCount: tokens.length ? tokens.reduce((a, b) => a + b, 0) : undefined,
+        costUsd: costs.length ? costs.reduce((a, b) => a + b, 0) : undefined,
+    };
+}
+/**
+ * Find the subagent children of a parent session and roll their totals up
+ * together with the parent's. Returns undefined when the session has no
+ * subagent children.
+ */
+export function subagentRollup(parent, sessions) {
+    if (!parent.sourcePath)
+        return undefined;
+    const parentResolved = path.resolve(parent.sourcePath);
+    const children = sessions.filter((s) => {
+        if (s === parent || !s.sourcePath)
+            return false;
+        const pp = subagentParentPath(s.sourcePath);
+        return pp !== undefined && path.resolve(pp) === parentResolved;
+    });
+    if (!children.length)
+        return undefined;
+    return {
+        subagentCount: children.length,
+        ...rollupSubagentTotals([parent, ...children]),
+    };
+}

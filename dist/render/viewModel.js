@@ -21,7 +21,7 @@ export const fmtDuration = (ms) => ms === undefined
     : ms < 1000
         ? `${ms}ms`
         : `${(ms / 1000).toFixed(ms < 10000 ? 2 : 1)}s`;
-export function deriveReplayViewModel(session, git) {
+export function deriveReplayViewModel(session, git, indexStats) {
     const events = session.events.length
         ? session.events
         : [
@@ -65,7 +65,7 @@ export function deriveReplayViewModel(session, git) {
         },
         replayStatus,
         capturedRunStatus,
-        metrics: deriveMetrics(normalizedSession, replayStatus, capturedRunStatus),
+        metrics: deriveMetrics(normalizedSession, replayStatus, capturedRunStatus, indexStats),
         timeline,
         graph: deriveExecutionGraph({
             session: normalizedSession,

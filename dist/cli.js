@@ -6,6 +6,7 @@ import { parseCodexSession } from "./providers/codex.js";
 import { parsePiSession } from "./providers/pi.js";
 import { parseGeneric } from "./providers/generic.js";
 import { renderReplay } from "./render/renderReplay.js";
+import { subagentRollup } from "./index/subagents.js";
 import { openBrowser } from "./utils/openBrowser.js";
 import { buildGitReplay } from "./git/gitReplay.js";
 import { installHooks, appendHook } from "./hooks/installHooks.js";
@@ -21,7 +22,7 @@ program
     .name("villani-flight-recorder")
     .description("Black box recorder for AI coding agents\n\nCommon workflow:\n  vfr scan\n  vfr browse\n  vfr replay --id <session-id>")
     .version("0.1.0");
-const RENDERER_VERSION = "0.1.0-no-coverage-v2";
+const RENDERER_VERSION = "0.1.0-index-stats-v3";
 async function readManifest(replayDir) {
     try {
         return JSON.parse(await fs.readFile(path.join(replayDir, "manifest.json"), "utf8"));
@@ -32,6 +33,18 @@ async function readManifest(replayDir) {
 }
 async function writeManifest(replayDir, manifest) {
     await fs.writeFile(path.join(replayDir, "manifest.json"), JSON.stringify(manifest, null, 2));
+}
+function indexStatsFor(rec, sessions) {
+    return {
+        tokenCount: rec.tokenCount,
+        inputTokenCount: rec.inputTokenCount,
+        outputTokenCount: rec.outputTokenCount,
+        cacheTokenCount: rec.cacheTokenCount,
+        reasoningTokenCount: rec.reasoningTokenCount,
+        costUsd: rec.costUsd,
+        model: rec.model,
+        subagents: subagentRollup(rec, sessions),
+    };
 }
 async function prepareReplayCache(idx, opts) {
     const replayDir = path.join(opts.base, "replays");
@@ -75,6 +88,7 @@ async function prepareReplayCache(idx, opts) {
                 out: replayPath,
                 returnHref,
                 returnLabel: "Back to sessions",
+                indexStats: indexStatsFor(s, idx.sessions),
             });
             generated++;
             next.push({
@@ -399,6 +413,7 @@ program
     let session;
     let selectedSessionId;
     let selectedSegmentId;
+    let indexStats;
     if (o.id ||
         o.segment ||
         o.repo ||
@@ -444,6 +459,10 @@ program
         selectedSegmentId = seg?.id;
         if (seg)
             session.events = session.events.slice(seg.startEventIndex, seg.endEventIndex + 1);
+        // Stored index totals cover the whole session, so only use them when
+        // replaying the full session, not a task-segment slice.
+        else
+            indexStats = indexStatsFor(srec, idx.sessions);
     }
     else if (o.session) {
         if (!o.provider) {
@@ -472,6 +491,7 @@ program
     }
     const file = await renderReplay(session, {
         redact: o.redact !== false,
+        indexStats,
         out: o.out ??
             (selectedSessionId && !selectedSegmentId
                 ? path.join(o.indexDir ?? defaultIndexDir(), "replays", `${selectedSessionId}.html`)

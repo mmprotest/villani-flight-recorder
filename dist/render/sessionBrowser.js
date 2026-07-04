@@ -3,7 +3,7 @@ import { escapeHtml, safeJsonForScript } from "./safeHtml.js";
 import { themeCss } from "./theme.js";
 import { formatTokenCount } from "../providers/helpers/tokens.js";
 import { formatUsd } from "./pricing.js";
-import { subagentParentPath } from "../index/subagents.js";
+import { rollupSubagentTotals, subagentParentPath, } from "../index/subagents.js";
 const label = (p) => p === "claude"
     ? "Claude"
     : p === "codex"
@@ -76,18 +76,13 @@ export function renderSessionBrowser(index, opts = {}) {
     for (const r of rows) {
         if (r.subagentCount > 0) {
             const family = [r, ...rows.filter((c) => c.subagentOf === r.id)];
-            const tokens = family
-                .map((x) => x.tokenCount)
-                .filter((n) => typeof n === "number");
-            if (tokens.length) {
-                r.tokenCount = tokens.reduce((a, b) => a + b, 0);
+            const totals = rollupSubagentTotals(family);
+            if (totals.tokenCount !== undefined) {
+                r.tokenCount = totals.tokenCount;
                 r.tokenLabel = formatTokenCount(r.tokenCount);
             }
-            const costs = family
-                .map((x) => x.costUsd)
-                .filter((n) => typeof n === "number");
-            if (costs.length)
-                r.costUsd = costs.reduce((a, b) => a + b, 0);
+            if (totals.costUsd !== undefined)
+                r.costUsd = totals.costUsd;
             r.rollupNote = `incl. ${r.subagentCount} subagent${r.subagentCount === 1 ? "" : "s"}`;
         }
         if (typeof r.costUsd === "number")
