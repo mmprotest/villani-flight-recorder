@@ -6,6 +6,9 @@ import { parseCodexSession } from "./providers/codex.js";
 import { parsePiSession } from "./providers/pi.js";
 import { parseGeneric } from "./providers/generic.js";
 import { renderReplay } from "./render/renderReplay.js";
+import { IndexSessionStats } from "./render/deriveMetrics.js";
+import { subagentRollup } from "./index/subagents.js";
+import { SessionRecord } from "./index/sessionTypes.js";
 import { openBrowser } from "./utils/openBrowser.js";
 import { buildGitReplay } from "./git/gitReplay.js";
 import { installHooks, appendHook } from "./hooks/installHooks.js";
@@ -26,7 +29,7 @@ program
   )
   .version("0.1.0");
 
-const RENDERER_VERSION = "0.1.0-no-coverage-v2";
+const RENDERER_VERSION = "0.1.0-index-stats-v3";
 type ReplayManifestEntry = {
   sessionId: string;
   sourcePath: string;
@@ -50,6 +53,21 @@ async function writeManifest(replayDir: string, manifest: ReplayManifest) {
     path.join(replayDir, "manifest.json"),
     JSON.stringify(manifest, null, 2),
   );
+}
+function indexStatsFor(
+  rec: SessionRecord,
+  sessions: SessionRecord[],
+): IndexSessionStats {
+  return {
+    tokenCount: rec.tokenCount,
+    inputTokenCount: rec.inputTokenCount,
+    outputTokenCount: rec.outputTokenCount,
+    cacheTokenCount: rec.cacheTokenCount,
+    reasoningTokenCount: rec.reasoningTokenCount,
+    costUsd: rec.costUsd,
+    model: rec.model,
+    subagents: subagentRollup(rec, sessions),
+  };
 }
 async function prepareReplayCache(
   idx: any,
@@ -105,6 +123,7 @@ async function prepareReplayCache(
         out: replayPath,
         returnHref,
         returnLabel: "Back to sessions",
+        indexStats: indexStatsFor(s, idx.sessions),
       });
       generated++;
       next.push({
@@ -466,6 +485,7 @@ program
     let session: ParsedSession;
     let selectedSessionId: string | undefined;
     let selectedSegmentId: string | undefined;
+    let indexStats: IndexSessionStats | undefined;
     if (
       o.id ||
       o.segment ||
@@ -529,6 +549,9 @@ program
           seg.startEventIndex,
           seg.endEventIndex + 1,
         );
+      // Stored index totals cover the whole session, so only use them when
+      // replaying the full session, not a task-segment slice.
+      else indexStats = indexStatsFor(srec, idx.sessions);
     } else if (o.session) {
       if (!o.provider) {
         for (const pr of ["claude", "codex", "pi"] as Provider[]) {
@@ -562,6 +585,7 @@ program
     }
     const file = await renderReplay(session, {
       redact: o.redact !== false,
+      indexStats,
       out:
         o.out ??
         (selectedSessionId && !selectedSegmentId

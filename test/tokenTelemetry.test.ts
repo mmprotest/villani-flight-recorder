@@ -151,7 +151,44 @@ describe("token telemetry", () => {
     ).toBe("42");
     const script = clientScript();
     expect(script).toContain("Token usage");
-    expect(script).toContain("Not captured for this event.");
+    // Events without usage render no token section at all.
+    expect(script).not.toContain("Not captured for this event.");
+    expect(script).toContain("if(!u)return ''");
+  });
+
+  it("prefers stored index stats over live recompute and falls back when absent", async () => {
+    const file = await fixture([
+      { type: "assistant", content: "hello", usage: { total_tokens: 42 } },
+    ]);
+    const s = await parseGeneric("unknown", file);
+    const ok = { label: "ok", tone: "success", reason: "ok" } as const;
+    const metrics = deriveMetrics(s, ok, ok, {
+      tokenCount: 500,
+      inputTokenCount: 300,
+      outputTokenCount: 200,
+      costUsd: 1.5,
+      model: "claude-sonnet-5",
+      subagents: { subagentCount: 2, tokenCount: 700, costUsd: 2 },
+    });
+    const tokens = metrics.find((m) => m.id === "tokens");
+    expect(tokens?.value).toBe("500");
+    expect(tokens?.subvalue).toContain("input 300");
+    expect(tokens?.subvalue).toContain("output 200");
+    const cost = metrics.find((m) => m.id === "cost");
+    expect(cost?.value).toBe("$1.50");
+    expect(cost?.label).toBe("EST. COST (USD)");
+    expect(metrics.find((m) => m.id === "model")?.value).toBe(
+      "claude-sonnet-5",
+    );
+    expect(metrics.find((m) => m.id === "subagents")?.value).toBe(
+      "incl. 2 subagents: 700 tokens / $2.00",
+    );
+    // Undefined index fields fall back to the live recompute from events.
+    for (const fallback of [undefined, {}]) {
+      const m = deriveMetrics(s, ok, ok, fallback);
+      expect(m.find((x) => x.id === "tokens")?.value).toBe("42");
+      expect(m.find((x) => x.id === "subagents")).toBeUndefined();
+    }
   });
 
   it("renders session browser token count", () => {

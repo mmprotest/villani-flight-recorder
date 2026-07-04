@@ -13,8 +13,9 @@ export const runnerLabel = (p) => ({
 })[p] ??
     p ??
     "Generic replay";
-export function deriveMetrics(session, replayStatus, capturedRunStatus) {
-    const tokenUsage = sumTokenUsage(session.events);
+export function deriveMetrics(session, replayStatus, capturedRunStatus, indexStats) {
+    const indexTokens = indexStats?.tokenCount !== undefined;
+    const tokenUsage = indexTokens ? undefined : sumTokenUsage(session.events);
     const cacheTokens = tokenUsage &&
         (tokenUsage.cacheCreationTokens !== undefined ||
             tokenUsage.cacheReadTokens !== undefined ||
@@ -23,69 +24,109 @@ export function deriveMetrics(session, replayStatus, capturedRunStatus) {
             (tokenUsage.cacheReadTokens ?? 0) +
             (tokenUsage.cachedTokens ?? 0)
         : undefined;
-    const tokenParts = [
-        tokenUsage?.inputTokens !== undefined
-            ? `input ${formatTokenCount(tokenUsage.inputTokens)}`
-            : undefined,
-        tokenUsage?.outputTokens !== undefined
-            ? `output ${formatTokenCount(tokenUsage.outputTokens)}`
-            : undefined,
-        cacheTokens !== undefined
-            ? `cache ${formatTokenCount(cacheTokens)}`
-            : undefined,
-        tokenUsage?.reasoningTokens !== undefined
-            ? `reasoning ${formatTokenCount(tokenUsage.reasoningTokens)}`
-            : undefined,
-    ]
+    const totalTokens = indexTokens
+        ? indexStats.tokenCount
+        : tokenUsage?.totalTokens;
+    const tokenParts = (indexTokens
+        ? [
+            indexStats.inputTokenCount !== undefined
+                ? `input ${formatTokenCount(indexStats.inputTokenCount)}`
+                : undefined,
+            indexStats.outputTokenCount !== undefined
+                ? `output ${formatTokenCount(indexStats.outputTokenCount)}`
+                : undefined,
+            indexStats.cacheTokenCount !== undefined
+                ? `cache ${formatTokenCount(indexStats.cacheTokenCount)}`
+                : undefined,
+            indexStats.reasoningTokenCount !== undefined
+                ? `reasoning ${formatTokenCount(indexStats.reasoningTokenCount)}`
+                : undefined,
+        ]
+        : [
+            tokenUsage?.inputTokens !== undefined
+                ? `input ${formatTokenCount(tokenUsage.inputTokens)}`
+                : undefined,
+            tokenUsage?.outputTokens !== undefined
+                ? `output ${formatTokenCount(tokenUsage.outputTokens)}`
+                : undefined,
+            cacheTokens !== undefined
+                ? `cache ${formatTokenCount(cacheTokens)}`
+                : undefined,
+            tokenUsage?.reasoningTokens !== undefined
+                ? `reasoning ${formatTokenCount(tokenUsage.reasoningTokens)}`
+                : undefined,
+        ])
         .filter(Boolean)
         .join(" · ");
-    const cost = estimateCost(session.events);
-    const costPartial = cost.unknownModels.length > 0 || cost.hasUsageWithoutModel;
-    const costCard = cost.perModel.length > 0
+    const cost = indexStats?.costUsd !== undefined
+        ? undefined
+        : estimateCost(session.events);
+    const costPartial = cost !== undefined &&
+        (cost.unknownModels.length > 0 || cost.hasUsageWithoutModel);
+    const costCard = indexStats?.costUsd !== undefined
         ? {
             id: "cost",
             label: "EST. COST (USD)",
-            value: `${costPartial ? "≥ " : ""}${formatUsd(cost.totalUsd)}`,
-            subvalue: [
-                cost.perModel
-                    .map((m) => `${shortModelName(m.model)} ${formatUsd(m.usd)}`)
-                    .join(" · "),
-                costPartial ? "partial — some usage not priceable" : undefined,
-                "estimate from list pricing",
-            ]
-                .filter(Boolean)
-                .join(" · "),
+            value: formatUsd(indexStats.costUsd),
+            subvalue: "estimate from list pricing",
             icon: "cost",
         }
-        : {
-            id: "cost",
-            label: "COST (USD)",
-            value: "Not captured",
-            subvalue: "No cost telemetry",
-            icon: "cost",
-            empty: true,
-        };
+        : cost.perModel.length > 0
+            ? {
+                id: "cost",
+                label: "EST. COST (USD)",
+                value: `${costPartial ? "≥ " : ""}${formatUsd(cost.totalUsd)}`,
+                subvalue: [
+                    cost.perModel
+                        .map((m) => `${shortModelName(m.model)} ${formatUsd(m.usd)}`)
+                        .join(" · "),
+                    costPartial ? "partial — some usage not priceable" : undefined,
+                    "estimate from list pricing",
+                ]
+                    .filter(Boolean)
+                    .join(" · "),
+                icon: "cost",
+            }
+            : {
+                id: "cost",
+                label: "COST (USD)",
+                value: "Not captured",
+                subvalue: "No cost telemetry",
+                icon: "cost",
+                empty: true,
+            };
+    const subagents = indexStats?.subagents;
+    const subagentCard = subagents && subagents.subagentCount > 0
+        ? {
+            id: "subagents",
+            label: "SUBAGENT ROLL-UP",
+            value: `incl. ${subagents.subagentCount} subagent${subagents.subagentCount === 1 ? "" : "s"}: ${formatTokenCount(subagents.tokenCount)} tokens / ${subagents.costUsd !== undefined ? formatUsd(subagents.costUsd) : "—"}`,
+            subvalue: "session + subagent children combined",
+            icon: "tokens",
+        }
+        : undefined;
     const dur = session.startedAt && session.endedAt
         ? fmtDuration(new Date(session.endedAt).getTime() -
             new Date(session.startedAt).getTime())
         : "Duration unavailable";
+    const model = session.model ?? indexStats?.model;
     return [
         {
             id: "task",
             label: "TASK",
             value: task(session),
-            subvalue: session.provider,
+            subvalue: model ? `${session.provider} · ${model}` : session.provider,
             icon: "task",
         },
         {
             id: "model",
             label: "MODEL",
-            value: session.model ?? "Provider format unknown",
-            subvalue: session.model
+            value: model ?? "Provider format unknown",
+            subvalue: model
                 ? "Captured model metadata"
                 : `${runnerLabel(session.provider)} session`,
             icon: "model",
-            empty: !session.model,
+            empty: !model,
         },
         {
             id: "runner",
@@ -98,17 +139,18 @@ export function deriveMetrics(session, replayStatus, capturedRunStatus) {
         {
             id: "tokens",
             label: "TOKENS",
-            value: tokenUsage?.totalTokens !== undefined
-                ? formatTokenCount(tokenUsage.totalTokens)
+            value: totalTokens !== undefined
+                ? formatTokenCount(totalTokens)
                 : "Not captured",
-            subvalue: tokenUsage?.totalTokens !== undefined
+            subvalue: totalTokens !== undefined
                 ? tokenParts || "Token telemetry captured"
                 : "No token telemetry",
             icon: "tokens",
-            telemetryAvailable: tokenUsage?.totalTokens !== undefined,
-            empty: tokenUsage?.totalTokens === undefined,
+            telemetryAvailable: totalTokens !== undefined,
+            empty: totalTokens === undefined,
         },
         costCard,
+        ...(subagentCard ? [subagentCard] : []),
         {
             id: "status",
             label: "STATUS",

@@ -2,7 +2,7 @@ import { GitInfo } from "../git/gitInfo.js";
 import { FlightEvent, ParsedSession } from "../providers/types.js";
 import { IconName } from "./components/icons.js";
 import { deriveExecutionGraph } from "./deriveGraph.js";
-import { deriveMetrics } from "./deriveMetrics.js";
+import { deriveMetrics, IndexSessionStats } from "./deriveMetrics.js";
 import { deriveTimeline } from "./deriveTimeline.js";
 import { deriveReplayStatus } from "./deriveReplayStatus.js";
 import { deriveCapturedRunStatus } from "./deriveCapturedRunStatus.js";
@@ -134,6 +134,7 @@ export const fmtDuration = (ms?: number) =>
 export function deriveReplayViewModel(
   session: ParsedSession,
   git: GitInfo | null,
+  indexStats?: IndexSessionStats,
 ): ReplayDashboardViewModel {
   const events = session.events.length
     ? session.events
@@ -179,7 +180,12 @@ export function deriveReplayViewModel(
     },
     replayStatus,
     capturedRunStatus,
-    metrics: deriveMetrics(normalizedSession, replayStatus, capturedRunStatus),
+    metrics: deriveMetrics(
+      normalizedSession,
+      replayStatus,
+      capturedRunStatus,
+      indexStats,
+    ),
     timeline,
     graph: deriveExecutionGraph({
       session: normalizedSession,
